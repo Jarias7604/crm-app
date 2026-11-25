@@ -34,6 +34,7 @@ const sActivos = loadShot('tickets_activos_limpio.png');
 const sCompletados = loadShot('tickets_completados.png');
 const sPanelSolucion = loadShot('ticket_panel_solucion.png');
 const sCrearModal = loadShot('chat_crear_ticket_modal.png');
+const sBusquedaGlobal = loadShot('tickets_busqueda_global.png');
 
 const commonHead = (title) => `<!DOCTYPE html>
 <html lang="es">
@@ -206,11 +207,11 @@ const hdr = (code = 'SOP-SOP-2026-01 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Soporte Técnico &amp; Equipo Comercial / Versión 1.0 · Documentación operativa</span>
+    <span>Soporte Técnico &amp; Equipo Comercial / Versión 1.1 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const TOTAL_PAGES = 7;
+const TOTAL_PAGES = 8;
 
 const html = `${commonHead('SOP-SOP-2026-01 — Gestión Estructurada de Tickets WhatsApp y Autoservicio Comercial')}
 
@@ -226,10 +227,10 @@ const html = `${commonHead('SOP-SOP-2026-01 — Gestión Estructurada de Tickets
       <div class="kicker" style="margin-top:20px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-SOP-2026-01</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.0 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.1 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026 (Actualización v1.1: Enlace directo + Buscador global)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Soporte Técnico, Desarrollo y Equipo Comercial (Diana, Patricia, Grecia)</td></tr>
-        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">Chat WhatsApp (/support/chat), Service Hub (/support/tickets), Edge Functions &amp; Notificaciones</td></tr>
+        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">Chat WhatsApp (/support/chat), Service Hub (/support/tickets), Deep-link ?ticket=, Edge Functions &amp; Notificaciones</td></tr>
       </table>
 
       <h3 class="sub-h">Responsables y roles en el flujo</h3>
@@ -453,7 +454,7 @@ const html = `${commonHead('SOP-SOP-2026-01 — Gestión Estructurada de Tickets
     <p class="lead-p">Cuando un cliente pregunte por teléfono o WhatsApp qué pasó con su reporte, consulta la respuesta en menos de 10 segundos.</p>
 
     <div class="step-hdr"><span class="num">01 ·</span> Entrar a Service Hub → Tickets y pulsar la pestaña Completados</div>
-    <p class="body-p">Abre <strong>Service Hub → Tickets</strong> y haz clic en el botón superior <strong>COMPLETADOS</strong>. Allí aparecen ordenados del más reciente al más antiguo los tickets finalizados. Escribe el <strong>nombre del cliente</strong>, el <strong>módulo</strong>, una palabra clave de la falla o el código <code>#ID</code> en <strong>Buscar ticket...</strong>.</p>
+    <p class="body-p">Abre <strong>Service Hub → Tickets</strong> y haz clic en el botón superior <strong>COMPLETADOS</strong>. Allí aparecen ordenados del más reciente al más antiguo los tickets finalizados. Escribe el <strong>nombre del cliente</strong>, el <strong>módulo</strong>, una palabra clave de la falla o el código <code>#ID</code> en <strong>Buscar #ID, cliente, módulo...</strong>.</p>
 
     <div class="shot-frame compact">
       <img src="${sCompletados}" alt="Vista Completados con búsqueda y vista previa verde de solución" />
@@ -467,11 +468,39 @@ const html = `${commonHead('SOP-SOP-2026-01 — Gestión Estructurada de Tickets
   ${ftr(6, TOTAL_PAGES)}
 </section>
 
-<!-- PAGE 7: 06 / DETALLE DE SOLUCIÓN, SEGUIDORES Y FUTURA FASE 2 -->
+<!-- PAGE 7: 06 / BUSCADOR GLOBAL Y ENLACE DIRECTO DESDE CORREO -->
 <section class="page">
   <div>
     ${hdr()}
-    <div class="kicker">06 / DETALLE DE SOLUCIÓN Y HOJA DE RUTA</div>
+    <div class="kicker">06 / ACTUALIZACIÓN v1.1 · BUSCADOR GLOBAL Y DEEP-LINK DIRECTO</div>
+    <h1 class="sec-h1">Encontrar cualquier ticket por #ID y abrir directo desde el correo</h1>
+    <p class="lead-p">Mejora desplegada para evitar búsquedas vacías al cambiar de pestaña o enlaces que detenían al usuario en el login.</p>
+
+    <div class="step-hdr"><span class="num">01 ·</span> Buscador global multiestado (sin importar la pestaña activa)</div>
+    <p class="body-p">Al escribir un código como <code>8295</code> o <code>#8295834D</code>, el cliente, el módulo o la solución en <strong>Buscar #ID, cliente, módulo...</strong>, el CRM busca automáticamente en <strong>todos los estados</strong> (<em>Activos + Completados</em>) ignorando tildes y el símbolo <code>#</code>, y muestra la insignia <strong>BUSCANDO EN TODOS LOS ESTADOS</strong> para confirmar el alcance global.</p>
+
+    <div class="shot-frame compact">
+      <img src="${sBusquedaGlobal}" alt="Buscador global por código 8295 encontrando ticket activo desde pestaña Completados" />
+      <div class="callout-box" style="left:79.2%;top:48.0%;width:15.0%;height:4.8%;"><span class="callout-tag">1. Buscador (8295)</span></div>
+      <div class="callout-box" style="left:72.9%;top:46.2%;width:5.8%;height:8.0%;"><span class="callout-tag bottom right">2. Busca en Activos + Completados</span></div>
+      <div class="callout-box" style="left:69.1%;top:75.0%;width:5.4%;height:5.0%;"><span class="callout-tag bottom right">3. Estado real (Generado)</span></div>
+      <div class="callout-box" style="left:22.6%;top:66.8%;width:72.4%;height:20.4%;"><span class="callout-tag bottom">4. Ticket #8295834D encontrado al instante aun estando en Completados</span></div>
+    </div>
+    <div class="fig-cap" style="margin-bottom:8px;">Figura 4. Búsqueda real en producción con el código <code>8295</code>: estando en la pestaña <em>Completados</em>, el buscador localiza el ticket <code>#8295834D</code>.</div>
+
+    <div class="info-box" style="margin-top:4px;">
+      <strong>02 · Botón “Ver Ticket en Arias CRM” en el correo (ariascrm.com + post-login automático):</strong><br/>
+      Todos los correos de notificación apuntan ahora siempre al dominio oficial <code>https://ariascrm.com/support/tickets?ticket=&lt;UUID&gt;</code> (nunca a URLs de preview de Vercel). Si tu sesión estaba cerrada, iniciarás sesión en <code>/login</code> y el sistema te redirigirá de forma automática al ticket exacto abierto en pantalla.
+    </div>
+  </div>
+  ${ftr(7, TOTAL_PAGES)}
+</section>
+
+<!-- PAGE 8: 07 / DETALLE DE SOLUCIÓN, SEGUIDORES Y FUTURA FASE 2 -->
+<section class="page">
+  <div>
+    ${hdr()}
+    <div class="kicker">07 / DETALLE DE SOLUCIÓN Y HOJA DE RUTA</div>
     <h1 class="sec-h1">Leer la Solución Aplicada y gestionar suscriptores</h1>
     <p class="lead-p">Al hacer clic en un ticket (o abrir el enlace que llega por correo/campana), se despliega el detalle completo a la derecha.</p>
 
@@ -482,7 +511,7 @@ const html = `${commonHead('SOP-SOP-2026-01 — Gestión Estructurada de Tickets
       <div class="callout-box" style="left:59.8%;top:33.8%;width:37.5%;height:17.2%;"><span class="callout-tag out-left">3. Solución Aplicada (lista para cliente)</span></div>
       <div class="callout-box" style="left:59.8%;top:52.2%;width:37.5%;height:11.2%;"><span class="callout-tag out-left">4. Suscriptores Campana + Email</span></div>
     </div>
-    <div class="fig-cap" style="margin-bottom:8px;">Figura 4. Panel lateral de detalle: bloque verde <em>Solución Aplicada</em> listo para copiar o parafrasear al cliente y chips de notificación.</div>
+    <div class="fig-cap" style="margin-bottom:8px;">Figura 5. Panel lateral de detalle: bloque verde <em>Solución Aplicada</em> listo para copiar o parafrasear al cliente y chips de notificación.</div>
 
     <h3 class="sub-h" style="margin-top:6px;">Recomendación de seguridad y Fase 2 futura (WhatsApp directo al cliente)</h3>
     <ul class="rules-list">
@@ -491,7 +520,7 @@ const html = `${commonHead('SOP-SOP-2026-01 — Gestión Estructurada de Tickets
       <li><strong>Nota de soporte:</strong> Si necesitas agregar a alguien más a un ticket ya abierto, basta un clic en su nombre dentro de <strong>Notificar cambios (Campana + Email)</strong>; se guarda al instante.</li>
     </ul>
   </div>
-  ${ftr(7, TOTAL_PAGES)}
+  ${ftr(8, TOTAL_PAGES)}
 </section>
 
 </body>
