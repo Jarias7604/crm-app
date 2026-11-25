@@ -52,7 +52,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
     <button
       type="button"
       onClick={() => onSelect(circle)}
-      className={`w-full text-left px-4 py-3.5 md:px-3.5 md:py-2.5 flex items-center gap-3 md:gap-2.5 transition relative border-l-[3px] ${
+      className={`w-full text-left px-4 py-3.5 md:px-3.5 md:py-2.5 flex items-start md:items-center gap-3 md:gap-2.5 transition relative border-l-[3px] ${
         isSelected
           ? 'bg-indigo-50/80 border-l-indigo-600'
           : unread
@@ -60,7 +60,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
           : 'bg-white hover:bg-slate-50/80 border-l-transparent'
       }`}
     >
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 mt-0.5 md:mt-0">
         <div
           className={`w-11 h-11 md:w-9.5 md:h-9.5 rounded-full flex items-center justify-center text-[14.5px] md:text-[13px] ${
             unread
@@ -75,13 +75,13 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
         {unread && <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white absolute -top-0.5 -right-0.5" />}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className={`text-[15.5px] md:text-[14px] truncate ${unread ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>
+        <div className="flex items-center justify-between gap-2 md:gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className={`text-[16px] md:text-[14px] leading-snug truncate ${unread ? 'font-bold text-slate-950' : 'font-semibold md:font-normal text-slate-800 md:text-slate-700'}`}>
               {circle.clientName}
             </span>
             <span
-              className={`text-[13px] md:text-[12px] shrink-0 ${
+              className={`hidden md:inline text-[12px] shrink-0 ${
                 circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
                   ? 'text-slate-500 font-normal'
                   : 'text-slate-400 font-normal'
@@ -92,7 +92,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.isReactivation && (
               <span
                 title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                className="text-[11.5px] md:text-[11px] font-normal text-slate-400 shrink-0"
+                className="hidden md:inline text-[11px] font-normal text-slate-400 shrink-0"
               >
                 {circle.reactivationReplied ? '· React.' : `· Toque ${circle.reactivationTouch || 1}`}
               </span>
@@ -100,7 +100,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.scope === 'lead' && qualifierStatus === 'handed_off' && (
               <span
                 title="El lead pidió hablar con un asesor humano"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10.5px] md:text-[10px] font-bold leading-none shrink-0"
+                className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold leading-none shrink-0"
               >
                 <UserCheck className="w-2.5 h-2.5" />
                 Asesor
@@ -109,7 +109,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.scope === 'lead' && isQualifierActive && qualifierStatus !== 'handed_off' && (
               <span
                 title="Calificador Comercial IA activo en este chat"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10.5px] md:text-[10px] font-bold leading-none shrink-0"
+                className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold leading-none shrink-0"
               >
                 <Bot className="w-2.5 h-2.5" />
                 IA
@@ -118,7 +118,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.scope === 'lead' && qualifierStatus === 'demo_booked' && (
               <span
                 title="Demo agendada automáticamente por IA"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10.5px] md:text-[10px] font-bold leading-none shrink-0"
+                className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold leading-none shrink-0"
               >
                 <Calendar className="w-2.5 h-2.5" />
                 Demo
@@ -129,7 +129,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {isOverdue && (
               <span
                 title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
-                className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold inline-flex items-center gap-0.5"
+                className="hidden md:inline-flex px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold items-center gap-0.5"
               >
                 <Clock className="w-3 h-3" />
                 {formatWaitDuration(circle.waitMinutes)}
@@ -141,7 +141,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
           </div>
         </div>
         <div className="flex items-center justify-between gap-2 mt-1 md:mt-0.5">
-          <p className={`text-[14px] md:text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
+          <p className={`text-[14px] md:text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-500 md:text-slate-400 font-normal'}`}>
             {circle.lastMessageSender}: {circle.lastMessageText}
           </p>
           {circle.teamStatus === 'unopened' ? (
@@ -195,6 +195,46 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
               Recordatorio
             </span>
           ) : null}
+        </div>
+        <div className="md:hidden mt-1.5 flex items-center gap-1.5 flex-wrap">
+          <span
+            className={`px-2 py-0.5 rounded-md text-[11.5px] font-semibold leading-none ${
+              circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
+                ? 'bg-slate-100 text-slate-500'
+                : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {shortType}
+          </span>
+          {circle.isReactivation && (
+            <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[11px] font-medium leading-none">
+              {circle.reactivationReplied ? 'React.' : `Toque ${circle.reactivationTouch || 1}`}
+            </span>
+          )}
+          {circle.scope === 'lead' && qualifierStatus === 'handed_off' && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold leading-none">
+              <UserCheck className="w-3 h-3" />
+              Asesor
+            </span>
+          )}
+          {circle.scope === 'lead' && isQualifierActive && qualifierStatus !== 'handed_off' && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold leading-none">
+              <Bot className="w-3 h-3" />
+              IA
+            </span>
+          )}
+          {circle.scope === 'lead' && qualifierStatus === 'demo_booked' && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold leading-none">
+              <Calendar className="w-3 h-3" />
+              Demo
+            </span>
+          )}
+          {isOverdue && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold leading-none">
+              <Clock className="w-3 h-3" />
+              {formatWaitDuration(circle.waitMinutes)}
+            </span>
+          )}
         </div>
       </div>
     </button>

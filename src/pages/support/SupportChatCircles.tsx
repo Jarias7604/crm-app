@@ -3455,7 +3455,7 @@ export const SupportChatCircles: React.FC = () => {
                       <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-2xs shrink-0">
                         <Bell className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-[14px] md:text-[13.5px] font-bold text-indigo-950 tracking-tight truncate">
+                      <span className="text-[16px] md:text-[13.5px] font-bold text-indigo-950 tracking-tight truncate">
                         Centro de Alertas WhatsApp
                       </span>
                     </div>
@@ -3467,7 +3467,7 @@ export const SupportChatCircles: React.FC = () => {
                           if (ok) toast.success('Alarma sonora verificada correctamente');
                           else toast.error('El navegador bloqueó el audio; haz clic e intenta de nuevo');
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-700 shadow-2xs transition"
+                        className="px-3 py-1.5 md:px-2.5 md:py-1 rounded-lg bg-white hover:bg-indigo-50 border border-indigo-200 text-[13.5px] md:text-xs font-semibold text-indigo-700 shadow-2xs transition"
                       >
                         <span className="sm:hidden">Sonido</span>
                         <span className="hidden sm:inline">Probar sonido</span>
@@ -3475,14 +3475,14 @@ export const SupportChatCircles: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setShowAlertsPopover(false)}
-                        className="p-1 rounded-lg text-indigo-700/70 hover:text-indigo-950 hover:bg-indigo-100/70"
+                        className="p-1.5 md:p-1 rounded-lg text-indigo-700/70 hover:text-indigo-950 hover:bg-indigo-100/70"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-5 h-5 md:w-4 md:h-4" />
                       </button>
                     </div>
                   </div>
 
-                  <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap text-xs shrink-0">
+                  <div className="px-4 py-2.5 md:py-2 bg-white border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap text-[14px] md:text-xs shrink-0">
                     <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
                       <input
                         type="checkbox"
@@ -3500,7 +3500,7 @@ export const SupportChatCircles: React.FC = () => {
                             if (p === 'granted') toast.success('Alertas de escritorio activadas');
                           });
                         }}
-                        className="text-xs font-semibold text-indigo-600 hover:underline"
+                        className="text-[13.5px] md:text-xs font-semibold text-indigo-600 hover:underline"
                       >
                         Activar aviso en escritorio
                       </button>
@@ -3508,8 +3508,8 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
 
                   {scopes.all && (
-                    <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center gap-1 flex-wrap shrink-0">
-                      <span className="text-xs font-medium text-slate-400 mr-1.5">Área:</span>
+                    <div className="px-4 py-2.5 md:py-2 bg-white border-b border-slate-200/80 flex items-center gap-1 flex-wrap shrink-0">
+                      <span className="text-[13.5px] md:text-xs font-medium text-slate-400 mr-1.5">Área:</span>
                       {(
                         [
                           { id: 'all', label: 'Todo' },
@@ -3521,7 +3521,7 @@ export const SupportChatCircles: React.FC = () => {
                           key={f.id}
                           type="button"
                           onClick={() => setAlertAreaFilter(f.id)}
-                          className={`px-2.5 py-1 rounded-lg text-xs transition ${
+                          className={`px-3 py-1.5 md:px-2.5 md:py-1 rounded-lg text-[13.5px] md:text-xs transition ${
                             alertAreaFilter === f.id
                               ? 'bg-indigo-50 text-indigo-700 font-bold'
                               : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -3537,15 +3537,15 @@ export const SupportChatCircles: React.FC = () => {
                     {alertCircles.total === 0 ? (
                       <div className="p-8 bg-white rounded-xl border border-slate-200/80 text-center space-y-1">
                         <CheckCircle2 className="w-6 h-6 text-slate-400 mx-auto" />
-                        <p className="text-[13px] font-bold text-slate-800">Todo al día</p>
-                        <p className="text-xs text-slate-400">No hay conversaciones ni leads pendientes de respuesta.</p>
+                        <p className="text-[15.5px] md:text-[13px] font-bold text-slate-800">Todo al día</p>
+                        <p className="text-[13.5px] md:text-xs text-slate-400">No hay conversaciones ni leads pendientes de respuesta.</p>
                       </div>
                     ) : (
                       <>
                         {alertCircles.newLeads.length > 0 && (
                           <div className="space-y-1.5">
                             <div className="px-1 flex items-center justify-between">
-                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <span className="text-[12.5px] md:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                                 <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
                                 Leads nuevos por tomar ({alertCircles.newLeads.length})
                               </span>
@@ -3568,20 +3568,20 @@ export const SupportChatCircles: React.FC = () => {
                                   }}
                                   className="w-full text-left px-3.5 py-2.5 bg-white hover:bg-indigo-50/40 rounded-xl border border-slate-200/90 hover:border-indigo-300 shadow-2xs flex items-center gap-3 transition"
                                 >
-                                  <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-semibold text-xs flex items-center justify-center shrink-0">
+                                  <div className="w-10 h-10 md:w-9 md:h-9 rounded-full bg-indigo-50 text-indigo-700 font-semibold text-[13.5px] md:text-xs flex items-center justify-center shrink-0">
                                     {initials(c.clientName)}
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-2">
                                       <div className="flex items-center gap-1.5 min-w-0">
-                                        <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
-                                        <span className="text-xs text-slate-400 shrink-0">· Por tomar</span>
+                                        <span className="text-[15.5px] md:text-[13.5px] font-bold md:font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                        <span className="hidden md:inline text-xs text-slate-400 shrink-0">· Por tomar</span>
                                       </div>
-                                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
+                                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[12px] md:text-[11px] font-semibold shrink-0">
                                         {c.waitMinutes > 0 ? formatWaitDuration(c.waitMinutes) : listTimeLabel(c.lastMessageAt)}
                                       </span>
                                     </div>
-                                    <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                    <p className="text-[14px] md:text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
                                   </div>
                                 </button>
                               ))}
@@ -3592,7 +3592,7 @@ export const SupportChatCircles: React.FC = () => {
                         {alertCircles.urgent.length > 0 && (
                           <div className="space-y-1.5">
                             <div className="px-1 flex items-center justify-between">
-                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <span className="text-[12.5px] md:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                                 <Clock className="w-3.5 h-3.5 text-rose-500" />
                                 Espera mayor a 15 min ({alertCircles.urgent.length})
                               </span>
@@ -3620,20 +3620,20 @@ export const SupportChatCircles: React.FC = () => {
                                       }}
                                       className="flex-1 min-w-0 text-left flex items-center gap-3"
                                     >
-                                      <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs flex items-center justify-center shrink-0">
+                                      <div className="w-10 h-10 md:w-9 md:h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-[13.5px] md:text-xs flex items-center justify-center shrink-0">
                                         {c.isGroup ? <Users className="w-4 h-4" /> : initials(c.clientName)}
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-2">
                                           <div className="flex items-center gap-1.5 min-w-0">
-                                            <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
-                                            <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
+                                            <span className="text-[15.5px] md:text-[13.5px] font-bold md:font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                            <span className="hidden md:inline text-xs text-slate-400 shrink-0">· {shortType}</span>
                                           </div>
-                                          <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200/80 text-[11px] font-semibold shrink-0">
+                                          <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200/80 text-[12px] md:text-[11px] font-semibold shrink-0">
                                             {formatWaitDuration(c.waitMinutes)}
                                           </span>
                                         </div>
-                                        <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                        <p className="text-[14px] md:text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
                                       </div>
                                     </button>
                                     <button
@@ -3654,7 +3654,7 @@ export const SupportChatCircles: React.FC = () => {
                         {alertCircles.waitingRecent.length > 0 && (
                           <div className="space-y-1.5">
                             <div className="px-1 flex items-center justify-between">
-                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <span className="text-[12.5px] md:text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                                 En espera reciente ({alertCircles.waitingRecent.length})
                               </span>
@@ -3679,20 +3679,20 @@ export const SupportChatCircles: React.FC = () => {
                                     }}
                                     className="w-full text-left px-3.5 py-2.5 bg-white hover:bg-indigo-50/40 rounded-xl border border-slate-200/90 hover:border-indigo-300 shadow-2xs flex items-center gap-3 transition"
                                   >
-                                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs flex items-center justify-center shrink-0">
+                                    <div className="w-10 h-10 md:w-9 md:h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-[13.5px] md:text-xs flex items-center justify-center shrink-0">
                                       {c.isGroup ? <Users className="w-4 h-4" /> : initials(c.clientName)}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                          <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
-                                          <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
+                                          <span className="text-[15.5px] md:text-[13.5px] font-bold md:font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                          <span className="hidden md:inline text-xs text-slate-400 shrink-0">· {shortType}</span>
                                         </div>
-                                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
+                                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[12px] md:text-[11px] font-semibold shrink-0">
                                           {formatWaitDuration(c.waitMinutes)}
                                         </span>
                                       </div>
-                                      <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                      <p className="text-[14px] md:text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
                                     </div>
                                   </button>
                                 );
@@ -3856,11 +3856,11 @@ export const SupportChatCircles: React.FC = () => {
                   className="md:hidden fixed inset-0 bg-slate-900/35 backdrop-blur-[1px] z-[200]"
                   onClick={() => setShowFilterMenu(false)}
                 />
-                <div className="fixed inset-x-3 top-28 max-h-[72dvh] overflow-y-auto z-[210] md:inset-auto md:absolute md:right-4 md:top-11 md:w-64 md:max-h-none md:z-30 bg-white border border-slate-200 rounded-2xl shadow-xl p-2.5 md:p-1.5 space-y-1 text-[13.5px] md:text-xs">
-                <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+                <div className="fixed inset-x-3 top-28 max-h-[72dvh] overflow-y-auto z-[210] md:inset-auto md:absolute md:right-4 md:top-11 md:w-64 md:max-h-none md:z-30 bg-white border border-slate-200 rounded-2xl shadow-xl p-3.5 md:p-1.5 space-y-1.5 md:space-y-1 text-[15.5px] md:text-xs">
+                <div className="px-3 py-1.5 md:px-2.5 md:py-1 text-[14px] md:text-[11px] font-bold md:font-semibold text-slate-500 md:text-slate-400 flex items-center justify-between">
                   <span>Refinar conversaciones</span>
-                  <button type="button" onClick={() => setShowFilterMenu(false)} className="text-slate-400 hover:text-slate-600">
-                    <X className="w-3 h-3" />
+                  <button type="button" onClick={() => setShowFilterMenu(false)} className="p-1.5 md:p-0 text-slate-400 hover:text-slate-600">
+                    <X className="w-4.5 h-4.5 md:w-3 md:h-3" />
                   </button>
                 </div>
 
@@ -3872,21 +3872,21 @@ export const SupportChatCircles: React.FC = () => {
                     setStateFilters((prev) => toggleStateFilterSelection(prev, 'replied'));
                     setShowFilterMenu(false);
                   }}
-                  className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
+                  className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
                     stateFilters.includes('replied')
                       ? 'bg-emerald-50 text-emerald-700 font-semibold'
                       : 'text-slate-700 hover:bg-slate-50 font-medium'
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <CheckCheck className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-emerald-600" />
                     Ya respondidos / atendidos
                   </span>
-                  <span className="text-slate-400">{contextCounts.replied}</span>
+                  <span className="text-[14.5px] md:text-xs font-semibold md:font-normal text-slate-400">{contextCounts.replied}</span>
                 </button>
 
                 <div className="pt-1 mt-1 border-t border-slate-100 space-y-0.5">
-                  <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Responsable / SLA</div>
+                  <div className="px-3 py-1 md:px-2.5 md:py-0.5 text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">Responsable / SLA</div>
                   {(
                     [
                       { id: 'all', label: 'Todos los agentes', count: contextCounts.total },
@@ -3905,7 +3905,7 @@ export const SupportChatCircles: React.FC = () => {
                           setOwnerFilter(sf.id);
                           setShowFilterMenu(false);
                         }}
-                        className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
+                        className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
                           active
                             ? 'bg-indigo-50 text-indigo-700 font-semibold'
                             : sf.urgent && sf.count > 0
@@ -3914,7 +3914,7 @@ export const SupportChatCircles: React.FC = () => {
                         }`}
                       >
                         <span>{sf.label}</span>
-                        <span className="text-slate-400">{sf.count}</span>
+                        <span className="text-[14.5px] md:text-xs font-semibold md:font-normal text-slate-400">{sf.count}</span>
                       </button>
                     );
                   })}
@@ -3922,7 +3922,7 @@ export const SupportChatCircles: React.FC = () => {
 
                 {scopes.all && (
                   <div className="pt-1.5 mt-1 border-t border-slate-100 space-y-0.5">
-                    <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Otras bandejas</div>
+                    <div className="px-3 py-1 md:px-2.5 md:py-0.5 text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">Otras bandejas</div>
                     {(
                       [
                         { id: 'interno' as SpecialTray, label: 'Equipo interno', count: counts.interno },
@@ -3943,12 +3943,12 @@ export const SupportChatCircles: React.FC = () => {
                             setSpecialTray(active ? null : sec.id);
                             setShowFilterMenu(false);
                           }}
-                          className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
+                          className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
                             active ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
                           }`}
                         >
                           <span>{sec.label}</span>
-                          <span className="text-slate-400">{sec.count}</span>
+                          <span className="text-[14.5px] md:text-xs font-semibold md:font-normal text-slate-400">{sec.count}</span>
                         </button>
                       );
                     })}
@@ -3957,14 +3957,14 @@ export const SupportChatCircles: React.FC = () => {
 
                 {scopes.soporte && (selectedBuckets.length === 0 || selectedBuckets.includes('soporte')) && (
                   <div className="pt-1.5 mt-1 border-t border-slate-100 px-2 pb-1 space-y-1">
-                    <span className="text-[11px] font-semibold text-slate-400">Área de soporte</span>
+                    <span className="text-[13.5px] md:text-[11px] font-semibold text-slate-400">Área de soporte</span>
                     <select
                       value={channelFilter}
                       onChange={(e) => {
                         setChannelFilter(e.target.value as 'all' | SupportChannelType);
                         setShowFilterMenu(false);
                       }}
-                      className="w-full px-2.5 py-1.5 rounded-xl text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200 focus:outline-none"
+                      className="w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl text-[15px] md:text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200 focus:outline-none"
                     >
                       <option value="all">Todas las áreas</option>
                       <option value="soporte">Soporte / Operaciones</option>
@@ -6282,19 +6282,19 @@ export const SupportChatCircles: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
               <div className="min-w-0 pr-2">
-                <p className="text-sm font-bold text-slate-900 truncate">{activeCircle.clientName}</p>
-                <p className="text-xs text-slate-500 truncate">
+                <p className="text-[16.5px] font-bold text-slate-900 truncate">{activeCircle.clientName}</p>
+                <p className="text-[13.5px] text-slate-500 truncate">
                   {activeCircle.isGroup ? 'Grupo de WhatsApp' : activeCircle.phone ? `+${activeCircle.phone}` : 'Chat WhatsApp'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowMobileActionsSheet(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0"
+                className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4.5 h-4.5" />
               </button>
             </div>
 
@@ -6302,7 +6302,7 @@ export const SupportChatCircles: React.FC = () => {
               (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') &&
               (scopes.all || scopes.leads) && (
                 <div className="space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-slate-400">
                     <Tag className="w-3.5 h-3.5 text-amber-600" />
                     <span>Cambiar estado del Lead</span>
                   </div>
@@ -6317,7 +6317,7 @@ export const SupportChatCircles: React.FC = () => {
                             setShowMobileActionsSheet(false);
                             handleUpdateLeadStatus(st);
                           }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                          className={`px-3.5 py-2 rounded-xl text-[14px] font-semibold border transition ${
                             active
                               ? 'bg-indigo-600 text-white border-indigo-600'
                               : 'bg-slate-50 text-slate-700 border-slate-200'
@@ -6339,18 +6339,18 @@ export const SupportChatCircles: React.FC = () => {
                     setShowMobileActionsSheet(false);
                     setShowCreateTicketModal(true);
                   }}
-                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-left"
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-left"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                      <TicketIcon className="w-4 h-4" />
+                    <span className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <TicketIcon className="w-4.5 h-4.5" />
                     </span>
                     <div>
-                      <p className="text-xs font-bold text-indigo-950">Crear Ticket Técnico (con IA)</p>
-                      <p className="text-[11px] text-indigo-700">Módulo — Problema concreto</p>
+                      <p className="text-[15px] font-bold text-indigo-950">Crear Ticket Técnico (con IA)</p>
+                      <p className="text-[13px] text-indigo-700">Módulo — Problema concreto</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-indigo-500 shrink-0" />
+                  <ChevronRight className="w-4.5 h-4.5 text-indigo-500 shrink-0" />
                 </button>
               )}
 
@@ -6361,18 +6361,18 @@ export const SupportChatCircles: React.FC = () => {
                     setShowMobileActionsSheet(false);
                     handleMarkCircleAttended(activeCircle);
                   }}
-                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-left"
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-left"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                      <CheckCircle2 className="w-4 h-4" />
+                    <span className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-4.5 h-4.5" />
                     </span>
                     <div>
-                      <p className="text-xs font-bold text-emerald-950">Marcar como Atendido</p>
-                      <p className="text-[11px] text-emerald-700">Limpia la alerta de espera</p>
+                      <p className="text-[15px] font-bold text-emerald-950">Marcar como Atendido</p>
+                      <p className="text-[13px] text-emerald-700">Limpia la alerta de espera</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <ChevronRight className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
                 </button>
               ) : (
                 <button
@@ -6381,18 +6381,18 @@ export const SupportChatCircles: React.FC = () => {
                     setShowMobileActionsSheet(false);
                     handleMarkCircleUnread(activeCircle);
                   }}
-                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-left"
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0">
-                      <RotateCcw className="w-4 h-4" />
+                    <span className="w-9 h-9 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+                      <RotateCcw className="w-4.5 h-4.5" />
                     </span>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">Devolver a No leído</p>
-                      <p className="text-[11px] text-slate-500">Para retomar después</p>
+                      <p className="text-[15px] font-bold text-slate-900">Devolver a No leído</p>
+                      <p className="text-[13px] text-slate-500">Para retomar después</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                  <ChevronRight className="w-4.5 h-4.5 text-slate-400 shrink-0" />
                 </button>
               )}
 
@@ -6400,23 +6400,23 @@ export const SupportChatCircles: React.FC = () => {
                 <a
                   href={`tel:+${activeCircle.phone.replace(/\D/g, '')}`}
                   onClick={() => setShowMobileActionsSheet(false)}
-                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-left"
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                      <Phone className="w-4 h-4" />
+                    <span className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                      <Phone className="w-4.5 h-4.5" />
                     </span>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">Llamar al contacto</p>
-                      <p className="text-[11px] text-slate-500">+{activeCircle.phone}</p>
+                      <p className="text-[15px] font-bold text-slate-900">Llamar al contacto</p>
+                      <p className="text-[13px] text-slate-500">+{activeCircle.phone}</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                  <ChevronRight className="w-4.5 h-4.5 text-slate-400 shrink-0" />
                 </a>
               )}
             </div>
 
-            <div className="p-2.5 rounded-xl bg-slate-100 text-[11px] text-slate-600 leading-snug">
+            <div className="p-3 rounded-xl bg-slate-100 text-[12.5px] text-slate-600 leading-snug">
               <strong>Cotizar, Diagnóstico, Agendar Meet, Ficha completa e IA</strong> están optimizados para <strong>Laptop / Desktop / Tablet</strong>.
             </div>
           </div>
