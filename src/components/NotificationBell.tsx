@@ -13,11 +13,13 @@ const ACTION_ICONS: Record<string, React.ReactNode> = {
   demo:                  <Monitor className="w-3.5 h-3.5" />,
   follow_up_reminder:    <Calendar className="w-3.5 h-3.5" />,
   stage_client_assigned: <GitBranch className="w-3.5 h-3.5" />,  // pipeline
+  ticket:                <span className="text-[11px]">🎫</span>,
 };
 
 // Bubble color per type — keeps pipeline (green) separated from leads (indigo)
 const TYPE_COLOR: Record<string, string> = {
   stage_client_assigned: 'bg-emerald-500',   // green  — pipeline
+  ticket:                'bg-violet-600',
 };
 const DEFAULT_UNREAD_COLOR = 'bg-indigo-500'; // indigo — leads/follow-ups
 

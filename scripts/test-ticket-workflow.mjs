@@ -102,3 +102,37 @@ test('matchesTicketSearchQuery finds tickets by 4-char ID, #ID, client, accents,
     assert.equal(mod.matchesTicketSearchQuery(sample, 'correlativo', agents), true);
     assert.equal(mod.matchesTicketSearchQuery(sample, '9999inexistente', agents), false);
 });
+
+test('extractTicketPathFromNotification extracts ticket deep-link or #code safely', () => {
+    assert.equal(
+        mod.extractTicketPathFromNotification({
+            type: 'ticket',
+            body: 'Estado: Ticket Generado · Ver: /support/tickets?ticket=8295834d-1d2d-4396-8def-07708f41ef1a',
+        }),
+        '/support/tickets?ticket=8295834d-1d2d-4396-8def-07708f41ef1a',
+    );
+    assert.equal(
+        mod.extractTicketPathFromNotification({
+            type: 'ticket',
+            title: '🎫 #8295834D · Ticket Generado: Facturación DTE',
+            body: 'Estado: Ticket Generado',
+        }),
+        '/support/tickets?ticket=8295834d',
+    );
+    assert.equal(
+        mod.extractTicketPathFromNotification({
+            type: 'ticket',
+            title: 'Actualización general de soporte',
+            body: 'Estado: En Proceso',
+        }),
+        '/support/tickets',
+    );
+    assert.equal(
+        mod.extractTicketPathFromNotification({
+            type: 'call',
+            title: 'Llamada pendiente',
+            body: 'Contactar al lead',
+        }),
+        null,
+    );
+});

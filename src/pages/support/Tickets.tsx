@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, ChevronRight, Timer, ShieldCheck, X, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users, Paperclip, Image, FileVideo, Trash2, Bell, Check } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
@@ -131,6 +131,7 @@ function Charts({ stats, agentCompliance, onOpenConfig }: {
 export default function Tickets() {
     const { profile } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [expandedTicketIds, setExpandedTicketIds] = useState<Set<string>>(new Set());
 
@@ -237,18 +238,17 @@ export default function Tickets() {
                 setStatusFilter(prev => [...prev, target.status]);
             }
             setSelected(target);
-            if (state?.openTicketId) {
-                window.history.replaceState({}, document.title);
-            }
+            navigate(location.pathname, { replace: true });
             return;
         }
 
-        if (!loading && profile?.company_id && cleanId.length >= 8) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+        if (!loading && profile?.company_id && isUuid) {
             supabase
                 .from('tickets')
                 .select('*')
                 .eq('company_id', profile.company_id)
-                .eq('id', targetTicketId)
+                .eq('id', cleanId)
                 .maybeSingle()
                 .then(
                     ({ data }) => {
@@ -258,12 +258,13 @@ export default function Tickets() {
                                 lead: data.lead_name ? { name: data.lead_name, email: null } : undefined,
                             } as Ticket;
                             setSelected(fetched);
+                            navigate(location.pathname, { replace: true });
                         }
                     },
                     () => { }
                 );
         }
-    }, [location.state, location.search, allTickets, statusFilter, loading, profile?.company_id]);
+    }, [location.pathname, location.state, location.search, navigate, allTickets, statusFilter, loading, profile?.company_id]);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -625,11 +626,10 @@ export default function Tickets() {
                                             <button
                                                 key={preset.label}
                                                 onClick={() => setStatusFilter(preset.statuses)}
-                                                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
-                                                    isActivePreset
-                                                        ? 'bg-indigo-600 text-white shadow-sm'
-                                                        : 'text-indigo-700/70 hover:text-indigo-900'
-                                                }`}
+                                                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${isActivePreset
+                                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                                    : 'text-indigo-700/70 hover:text-indigo-900'
+                                                    }`}
                                             >
                                                 {preset.label}
                                             </button>
@@ -645,7 +645,7 @@ export default function Tickets() {
                                 </div>
                                 <div className="h-4 w-px bg-gray-200" />
                                 {/* Expand/collapse advanced filters */}
-                                 <button onClick={() => setShowFilters(p => !p)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase transition-all ${showFilters ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                <button onClick={() => setShowFilters(p => !p)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase transition-all ${showFilters ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                                     }`}>
                                     <Filter className="w-3.5 h-3.5" />
                                     Filtros
@@ -779,7 +779,7 @@ export default function Tickets() {
                             </tr></thead>
                             <tbody className="divide-y divide-gray-50">
                                 {loading ? Array.from({ length: 4 }).map((_, i) => (
-                                    <tr key={i} className="animate-pulse">{[0,1,2,3,4,5,6,7,8,9].map(j => <td key={j} className="px-4 py-4"><div className="h-3 bg-gray-100 rounded-full" /></td>)}</tr>
+                                    <tr key={i} className="animate-pulse">{[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(j => <td key={j} className="px-4 py-4"><div className="h-3 bg-gray-100 rounded-full" /></td>)}</tr>
                                 )) : filtered.length === 0 ? (
                                     <tr><td colSpan={10} className="py-16 text-center"><TicketIcon className="w-10 h-10 text-gray-100 mx-auto mb-3" /><p className="text-sm font-bold text-gray-300">No hay tickets</p></td></tr>
                                 ) : (() => {
@@ -794,7 +794,7 @@ export default function Tickets() {
                                         const stepIdx = STATUS_ORDER.indexOf(ticket.status);
                                         const overdue = ticket.due_date && new Date(ticket.due_date) < new Date();
                                         const parentTicket = ticket.parent_ticket_id ? allTickets.find(t => t.id === ticket.parent_ticket_id) : null;
-                                        
+
                                         const hasChildren = allTickets.some(t => t.parent_ticket_id === ticket.id);
                                         const isExpanded = expandedTicketIds.has(ticket.id);
 
@@ -817,7 +817,7 @@ export default function Tickets() {
                                                             </button>
                                                         )}
                                                         {!isSubticket && !hasChildren && <span className="w-5 shrink-0" />}
-                                                        
+
                                                         {isSubticket && <span className="text-gray-300 font-bold select-none mr-0.5 text-xs">↳</span>}
 
                                                         <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded-md tracking-widest">#{ticket.id.slice(0, 8).toUpperCase()}</span>
@@ -832,11 +832,11 @@ export default function Tickets() {
                                                         </p>
                                                     )}
                                                     {Array.isArray(ticket.checklist) && ticket.checklist.length > 0 && (
-                                                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 select-none">
-                                                             <CheckCircle2 size={11} className={ticket.checklist.every(c => c.status === 'passed') ? "text-emerald-500 shrink-0" : "text-indigo-400 shrink-0"} />
-                                                             <span>{ticket.checklist.filter(c => c.status === 'passed').length}/{ticket.checklist.length} pruebas</span>
-                                                         </div>
-                                                     )}
+                                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 select-none">
+                                                            <CheckCircle2 size={11} className={ticket.checklist.every(c => c.status === 'passed') ? "text-emerald-500 shrink-0" : "text-indigo-400 shrink-0"} />
+                                                            <span>{ticket.checklist.filter(c => c.status === 'passed').length}/{ticket.checklist.length} pruebas</span>
+                                                        </div>
+                                                    )}
                                                     {parentTicket && isFilterOrSearchActive && (
                                                         <div className="flex items-center gap-1 mt-0.5 text-[10px] text-indigo-500 font-bold hover:underline" onClick={(e) => { e.stopPropagation(); setSelected(parentTicket); }}>
                                                             <span>↳ Subticket de: #{parentTicket.id.slice(0, 8).toUpperCase()} - {parentTicket.title}</span>
@@ -1121,7 +1121,7 @@ export default function Tickets() {
                                                 value={newT.due_date} onChange={e => setNewT(p => ({ ...p, due_date: e.target.value }))} />
                                         </div>
                                     </div>
-                                    
+
                                     {/* Parent Ticket Selection */}
                                     <div className="mb-4 relative" ref={parentDropdownRef}>
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ticket Padre (Opcional)</label>
@@ -1197,8 +1197,8 @@ export default function Tickets() {
                                                     </button>
                                                     {allTickets
                                                         .filter(t => !t.parent_ticket_id)
-                                                        .filter(t => 
-                                                            t.title.toLowerCase().includes(parentSearch.toLowerCase()) || 
+                                                        .filter(t =>
+                                                            t.title.toLowerCase().includes(parentSearch.toLowerCase()) ||
                                                             t.id.toLowerCase().includes(parentSearch.toLowerCase())
                                                         )
                                                         .map(t => (
@@ -1210,9 +1210,8 @@ export default function Tickets() {
                                                                     setIsParentDropdownOpen(false);
                                                                     setParentSearch('');
                                                                 }}
-                                                                className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-gray-50 flex items-center justify-between ${
-                                                                    newT.parent_ticket_id === t.id ? 'bg-indigo-50/40 text-indigo-700' : 'text-gray-700'
-                                                                }`}
+                                                                className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-gray-50 flex items-center justify-between ${newT.parent_ticket_id === t.id ? 'bg-indigo-50/40 text-indigo-700' : 'text-gray-700'
+                                                                    }`}
                                                             >
                                                                 <span className="truncate flex items-center gap-1.5">
                                                                     <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-1 py-0.5 rounded">
@@ -1296,11 +1295,10 @@ export default function Tickets() {
                                                                 ? p.watchers.filter(id => id !== a.id)
                                                                 : [...p.watchers, a.id],
                                                         }))}
-                                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
-                                                            active
-                                                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                                                : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
-                                                        }`}
+                                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${active
+                                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                                            : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                                                            }`}
                                                     >
                                                         {active && <Check className="w-3 h-3" />}
                                                         <span>{a.full_name}</span>

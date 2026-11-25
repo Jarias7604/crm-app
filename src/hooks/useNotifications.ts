@@ -6,6 +6,7 @@ import {
   pushService,
   type AppNotification,
 } from '../services/notifications';
+import { extractTicketPathFromNotification } from '../lib/ticketWorkflow';
 
 const POLL_INTERVAL_MS = 60_000; // Check every 60 seconds
 
@@ -115,6 +116,11 @@ export function useNotifications() {
     async (notif: AppNotification) => {
       await handleMarkRead(notif.id);
       setIsOpen(false);
+      const ticketPath = extractTicketPathFromNotification(notif);
+      if (ticketPath) {
+        navigate(ticketPath, { state: { _t: Date.now() }, replace: false });
+        return;
+      }
       if (notif.lead_id) {
         // Navigate using location.state so Leads.tsx can open the lead detail panel
         // Add timestamp to force re-trigger even if already on /leads

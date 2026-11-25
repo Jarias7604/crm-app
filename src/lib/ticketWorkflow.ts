@@ -223,3 +223,23 @@ export function matchesTicketSearchQuery(
 
     return tokens.every((tok) => haystack.includes(tok));
 }
+
+export function extractTicketPathFromNotification(notif: {
+    type?: string | null;
+    body?: string | null;
+    title?: string | null;
+}): string | null {
+    const bodyText = String(notif.body || '');
+    const explicitMatch = bodyText.match(/\/support\/tickets(?:\?ticket=[A-Za-z0-9-]+)?/);
+    if (explicitMatch) {
+        return explicitMatch[0];
+    }
+    if (notif.type === 'ticket') {
+        const titleMatch = String(notif.title || '').match(/#([A-Fa-f0-9]{6,36})/);
+        if (titleMatch) {
+            return `/support/tickets?ticket=${encodeURIComponent(titleMatch[1].toLowerCase())}`;
+        }
+        return '/support/tickets';
+    }
+    return null;
+}
