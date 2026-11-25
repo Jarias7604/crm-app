@@ -27,7 +27,9 @@ function resolveChromePath() {
 
 function loadShot(name) {
   const full = path.join(SCRATCH_SHOTS, name);
-  return `data:image/png;base64,${fs.readFileSync(full).toString('base64')}`;
+  const ext = path.extname(name).toLowerCase();
+  const mime = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+  return `data:${mime};base64,${fs.readFileSync(full).toString('base64')}`;
 }
 
 const sLista = loadShot('mobile_chat_lista.png');
@@ -36,6 +38,7 @@ const sAccionesMsg = loadShot('mobile_chat_acciones_mensaje.png');
 const sMenu = loadShot('mobile_chat_menu_acciones.png');
 const sAlertas = loadShot('mobile_chat_alertas_centrado.png');
 const sFiltros = loadShot('mobile_chat_filtros.png');
+const sBridgeQr = loadShot('bridge_status_qr.jpg');
 
 const hdr = () => `
   <div class="top-rule">
@@ -45,11 +48,11 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.4 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.5 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const TOTAL_PAGES = 5;
+const TOTAL_PAGES = 6;
 
 const html = `<!DOCTYPE html>
 <html lang="es">
@@ -229,8 +232,8 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.4 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026 (v1.4: Jerarquía visual leídos suaves vs. no leídos en negrita)</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.5 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">25 de noviembre de 2026 (v1.5: Escudo Anti-Ban 20/h · 60/día y Reconexión / QR en vivo desde ⚙️)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
         <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav, Sidebar, retiro/redirección de /marketing/chat → /support/chat y ChatComposer responsivo</td></tr>
       </table>
@@ -442,6 +445,41 @@ const html = `<!DOCTYPE html>
     </div>
   </div>
   ${ftr(5, TOTAL_PAGES)}
+</section>
+
+<!-- PAGE 6: PROTECCIÓN ANTI-BAN Y RECONEXIÓN / QR DESDE ENGRANAJE ⚙️ -->
+<section class="page">
+  <div>
+    ${hdr()}
+    <div class="kicker">05 / PROTECCIÓN ANTI-BAN Y RECONEXIÓN WHATSAPP</div>
+    <h1 class="sec-h1">Escudo Anti-Ban en reactivaciones y visor QR en vivo (⚙️)</h1>
+    <p class="lead-p">Para proteger el número de Soporte (<code>+503 7971-8911</code>) contra restricciones temporales de Meta/WhatsApp, el CRM aplica límites estrictos en servidor y permite diagnosticar o re-vincular la sesión directamente desde el engranaje <strong>⚙️</strong>.</p>
+
+    <div style="display:flex; flex-direction:column; align-items:center; margin: 4px 0 8px 0;">
+      <div class="phone-frame" style="width: 88%; margin-top: 6px; border-radius: 10px;">
+        <img src="${sBridgeQr}" alt="Modal Estado de conexión WhatsApp con QR en vivo" style="border-radius: 6px;" />
+        <div class="callout-box" style="left:95.2%;top:17.2%;width:2.2%;height:3.6%;"><span class="callout-tag right">1. Engranaje ⚙️</span></div>
+        <div class="callout-box" style="left:39.2%;top:19.0%;width:23.0%;height:70.5%;"><span class="callout-tag">2. Estado sesión + QR en vivo + Reconectar</span></div>
+      </div>
+      <div class="fig-cap" style="margin-top: 8px;"><strong>Figura 7.</strong> Vista de producción (<code>ariascrm.com/support/chat</code>): desde el ícono ⚙️ se abre el diagnóstico de conexión, código QR escaneable y botón <em>Reconectar / Generar QR</em> sin banners invasivos en el área de trabajo.</div>
+    </div>
+
+    <table class="inst" style="margin-bottom: 8px;">
+      <thead>
+        <tr><th style="width:32%;">Control / Regla</th><th style="width:68%;">Comportamiento automático en Producción</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Límites Anti-Ban en servidor</strong></td><td>Máximo <strong>20 reactivaciones por hora</strong>, <strong>60 por día (24h)</strong> y mínimo <strong>20s</strong> entre envíos (<code>HTTP 429</code>); bloquea lotes si la sesión no está <code>open</code> (<code>HTTP 503</code>).</td></tr>
+        <tr><td><strong>Modal Reactivación Segura</strong></td><td>Lotes permitidos solo de <strong>10, 20 (recomendado) o 30</strong> prospectos; pausa humana aleatoria de <strong>25–37s</strong> y aborto automático ante errores o límites.</td></tr>
+        <tr><td><strong>Watchdog &amp; Visor QR (⚙️)</strong></td><td>Auto-recupera caídas de red (<code>close</code>) cada 2 min; si WhatsApp exige re-vincular (<code>401</code>), pausa reinicios y muestra el QR vivo en <strong>Estado de la conexión WhatsApp</strong>.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="alert-box" style="margin: 4px 0 0 0;">
+      <strong>Protocolo si aparece restricción temporal en el teléfono (+503 7971-8911):</strong> esperar a que venza el contador en el celular, eliminar sesiones viejas en <em>Dispositivos vinculados</em> (mantener cupo libre debajo de 4) y pulsar <strong>Reconectar / Generar QR</strong> desde ⚙️. Para envíos masivos mayores a 60/día usar un número aparte con <strong>API Oficial de Meta</strong>.
+    </div>
+  </div>
+  ${ftr(6, TOTAL_PAGES)}
 </section>
 
 </body>

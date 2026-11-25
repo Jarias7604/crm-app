@@ -3838,37 +3838,11 @@ export const SupportChatCircles: React.FC = () => {
         </div>
       </header>
 
-      {waConnectionState && waConnectionState !== 'open' && (
-        <div
-          className={`${
-            mobileChatOpen && activeCircle ? 'mt-[60px] lg:mt-0' : 'mt-14 lg:mt-0'
-          } bg-rose-50 border-b border-rose-200 px-4 py-2 flex items-center justify-between gap-3 shrink-0`}
-        >
-          <div className="flex items-center gap-2 min-w-0 text-xs sm:text-[13px] font-semibold text-rose-800">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span className="truncate sm:whitespace-normal">
-              WhatsApp (+503 7971-8911) está desconectado — no se envían ni reciben mensajes.
-            </span>
-          </div>
-          {isRealAdmin && (
-            <button
-              type="button"
-              onClick={openBridgeStatus}
-              className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shrink-0 transition"
-            >
-              Reconectar / Ver QR
-            </button>
-          )}
-        </div>
-      )}
-
       <div className="flex-1 flex lg:overflow-hidden">
         {/* ── LEFT: chat list (Responsive on Tablet/Mobile + Collapsible on Desktop) ── */}
         <aside
           style={{ ['--left-w' as any]: `${leftPanelWidth}px` }}
-          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] ${
-            waConnectionState && waConnectionState !== 'open' ? 'pt-0' : 'pt-14'
-          } lg:pt-0 ${
+          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] pt-14 lg:pt-0 ${
             mobileChatOpen && activeCircle ? 'hidden' : 'flex'
           } ${leftListCollapsed ? 'lg:hidden' : 'lg:flex'}`}
         >
@@ -4347,9 +4321,7 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── CENTER: chat ── */}
         {activeCircle ? (
           <main
-            className={`flex-1 flex-col bg-[#F3F4F8] ${
-              waConnectionState && waConnectionState !== 'open' ? 'pt-0' : 'pt-[60px]'
-            } pb-[76px] lg:pt-0 lg:pb-0 lg:overflow-hidden min-w-0 ${
+            className={`flex-1 flex-col bg-[#F3F4F8] pt-[60px] pb-[76px] lg:pt-0 lg:pb-0 lg:overflow-hidden min-w-0 ${
               mobileChatOpen ? 'flex' : 'hidden lg:flex'
             }`}
           >
