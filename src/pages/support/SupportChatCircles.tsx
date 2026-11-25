@@ -76,6 +76,7 @@ import type { Lead } from '../../types';
 import NewFollowUpModal from '../../components/NewFollowUpModal';
 import GoogleMeetScheduler from '../../components/GoogleMeetScheduler';
 import { CreateTicketFromChatModal } from './components/CreateTicketFromChatModal';
+import { resolveCircleLeadStatus, shouldPauseAiOnLeadStatus } from '../../lib/leadStatusSync';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { cotizacionesService } from '../../services/cotizaciones';
@@ -993,6 +994,9 @@ export const SupportChatCircles: React.FC = () => {
       const hasClientLine = descStats.hasClientLine;
       const staffLineCount = descStats.staffLineCount;
       const metaLeadStatus = String(meta.wa_lead_status || activeMeta.wa_lead_status || '').trim() || null;
+      const hasManualOverride = Boolean(
+        meta.wa_lead_status_override || activeMeta.wa_lead_status_override
+      );
       const isNonWaError =
         !hasClientLine &&
         lastFromNormalized !== 'client' &&
@@ -1001,7 +1005,12 @@ export const SupportChatCircles: React.FC = () => {
           nonWaTicketIds.has(activeTicket.id) ||
           nonWaTicketIds.has(latest.id));
 
-      const resolvedLeadStatus = isNonWaError ? 'Erróneo' : lead?.status || metaLeadStatus;
+      const resolvedLeadStatus = resolveCircleLeadStatus({
+        leadStatus: lead?.status,
+        metaLeadStatus,
+        isNonWaError,
+        hasManualOverride,
+      });
       const isDiscardedLead = resolvedLeadStatus === 'Perdido' || resolvedLeadStatus === 'Erróneo';
       const mergedReadByMap: Record<string, string> = {};
       for (const srcMap of [meta.wa_read_by, activeMeta.wa_read_by]) {
@@ -2530,19 +2539,36 @@ export const SupportChatCircles: React.FC = () => {
     const circle = targetCircle || activeCircle;
     if (!circle || !activeCompanyId) return;
     const isDiscard = newStatus === 'Perdido' || newStatus === 'Erróneo';
+    const pauseAi = shouldPauseAiOnLeadStatus(newStatus);
     const nowIso = new Date().toISOString();
 
+    const phoneDigits = String(circle.phone || '').replace(/\D/g, '');
+    const resolvedLeadId =
+      circle.leadId ||
+      (phoneDigits.length >= 8
+        ? companyLeads.find(
+            (l) => String(l.phone || '').replace(/\D/g, '').slice(-8) === phoneDigits.slice(-8)
+          )?.id || null
+        : null);
+
+    const prevLeadsSnapshot = companyLeads;
+    const prevNonWaSnapshot = nonWaTicketIds;
+    const circleTicketIds = (circle.allClientTickets && circle.allClientTickets.length > 0
+      ? circle.allClientTickets
+      : [circle.activeTicket]
+    ).map((t) => t.id);
+
     // Instant optimistic UI update
-    if (circle.leadId) {
+    if (resolvedLeadId) {
       setCompanyLeads((prev) => {
-        const exists = prev.some((l) => l.id === circle.leadId);
+        const exists = prev.some((l) => l.id === resolvedLeadId);
         if (exists) {
-          return prev.map((l) => (l.id === circle.leadId ? { ...l, status: newStatus } : l));
+          return prev.map((l) => (l.id === resolvedLeadId ? { ...l, status: newStatus } : l));
         }
         return [
           ...prev,
           {
-            id: circle.leadId!,
+            id: resolvedLeadId,
             name: circle.clientName,
             email: null,
             phone: circle.phone,
@@ -2550,6 +2576,13 @@ export const SupportChatCircles: React.FC = () => {
             es_cliente: false,
           } as TicketLead,
         ];
+      });
+    }
+    if (newStatus !== 'Erróneo') {
+      setNonWaTicketIds((prev) => {
+        const next = new Set(prev);
+        circleTicketIds.forEach((tid) => next.delete(tid));
+        return next;
       });
     }
     if (isDiscard) {
@@ -2566,42 +2599,92 @@ export const SupportChatCircles: React.FC = () => {
     }
 
     try {
-      if (circle.leadId) {
-        const { error } = await supabase
+      let leadUpdatedDirectly = false;
+      if (resolvedLeadId) {
+        const { data: updatedRows, error } = await supabase
           .from('leads')
           .update({ status: newStatus })
-          .eq('id', circle.leadId)
-          .eq('company_id', activeCompanyId);
-        if (error) throw error;
+          .eq('id', resolvedLeadId)
+          .eq('company_id', activeCompanyId)
+          .select('id, status');
+        if (!error && updatedRows && updatedRows.length > 0) {
+          leadUpdatedDirectly = true;
+        }
       }
 
-      const curMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
-      await supabase
-        .from('tickets')
-        .update({
-          metadata: {
-            ...curMeta,
-            ...(curMeta.wa_scope === 'por_clasificar' ? { wa_scope: 'lead' } : {}),
-            wa_lead_status: newStatus,
-            ...(isDiscard ? { wa_attended_at: nowIso } : {}),
-          },
-        })
-        .eq('id', circle.activeTicket.id);
+      if (!leadUpdatedDirectly) {
+        // Fallback via service-role edge function (handles RLS edge cases & links lead_id by phone)
+        const res = await invoke({
+          action: 'update_lead_status',
+          ticket_id: circle.activeTicket.id,
+          lead_id: resolvedLeadId || undefined,
+          status: newStatus,
+        });
+        if (!res?.ok) {
+          throw new Error(res?.error || 'No se pudo sincronizar el estado con el lead');
+        }
+      } else {
+        // Sync all tickets in this circle so metadata matches leads.status cleanly
+        const ticketsToSync =
+          circle.allClientTickets && circle.allClientTickets.length > 0
+            ? circle.allClientTickets
+            : [circle.activeTicket];
+        for (const tRow of ticketsToSync) {
+          const curMeta = { ...((tRow.metadata || {}) as Record<string, any>) };
+          if (newStatus !== 'Erróneo') {
+            delete curMeta.wa_delivery_error;
+          }
+          await supabase
+            .from('tickets')
+            .update({
+              ...(resolvedLeadId && !tRow.lead_id ? { lead_id: resolvedLeadId } : {}),
+              metadata: {
+                ...curMeta,
+                ...(curMeta.wa_scope === 'por_clasificar' ? { wa_scope: 'lead' } : {}),
+                wa_lead_status: newStatus,
+                wa_lead_status_override: true,
+                ...(isDiscard ? { wa_attended_at: nowIso } : {}),
+                ...(pauseAi ? { ai_qualifier_active: false } : {}),
+              },
+            })
+            .eq('id', tRow.id);
+        }
 
-      await supabase.from('ticket_comments').insert({
-        ticket_id: circle.activeTicket.id,
-        company_id: activeCompanyId,
-        author_id: profile?.id || null,
-        body: `${profile?.full_name || 'Equipo'} actualizó etapa del lead a: ${newStatus}`,
-        is_internal: true,
-      });
-      toast.success(isDiscard ? `Marcado como ${newStatus} y atendido` : `Etapa del lead: ${newStatus}`);
+        if (pauseAi && resolvedLeadId) {
+          await supabase
+            .from('lead_qualifier_sessions')
+            .update({
+              status: 'closed_discarded',
+              handoff_reason: `Etapa cambiada a ${newStatus} desde Chat WhatsApp`,
+              handoff_at: nowIso,
+            })
+            .eq('company_id', activeCompanyId)
+            .eq('lead_id', resolvedLeadId)
+            .in('status', ['active', 'pending_first_touch', 'waiting_reply']);
+        }
+
+        await supabase.from('ticket_comments').insert({
+          ticket_id: circle.activeTicket.id,
+          company_id: activeCompanyId,
+          author_id: profile?.id || null,
+          body: `${profile?.full_name || 'Equipo'} actualizó etapa del lead a: ${newStatus}`,
+          is_internal: true,
+        });
+      }
+
+      toast.success(
+        isDiscard
+          ? `Lead y chat marcados como ${newStatus} ✓`
+          : `Etapa sincronizada en Lead y Chat: ${newStatus}`
+      );
       loadSupportData(true);
       if (activeCircle?.circleId === circle.circleId) {
         loadThread(false);
       }
     } catch (err: any) {
-      toast.error(err?.message || 'No se pudo actualizar la etapa');
+      setCompanyLeads(prevLeadsSnapshot);
+      setNonWaTicketIds(prevNonWaSnapshot);
+      toast.error(err?.message || 'No se pudo actualizar la etapa en el Lead');
     }
   };
 

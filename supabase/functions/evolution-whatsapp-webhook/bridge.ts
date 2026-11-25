@@ -402,6 +402,79 @@ export async function handleBridgeAck(supabase: any, url: URL, payload: any): Pr
     .maybeSingle();
   if (!ob) return json({ ok: false, error: 'outbox item not found' }, 404);
 
+  if (!sentId && /"exists"\s*:\s*false/i.test(evoError) && ob.ticket_id) {
+    try {
+      const [{ data: inboundRows }, { data: sentRows }, { data: tRow }] = await Promise.all([
+        supabase
+          .from('whatsapp_messages')
+          .select('id')
+          .eq('ticket_id', ob.ticket_id)
+          .eq('from_me', false)
+          .limit(1),
+        supabase
+          .from('whatsapp_outbox')
+          .select('id')
+          .eq('ticket_id', ob.ticket_id)
+          .eq('status', 'sent')
+          .not('wa_message_id', 'is', null)
+          .limit(1),
+        supabase
+          .from('tickets')
+          .select('id, company_id, lead_id, metadata')
+          .eq('id', ob.ticket_id)
+          .maybeSingle(),
+      ]);
+
+      const hasInbound = Boolean(inboundRows && inboundRows.length > 0);
+      const hasSent = Boolean(sentRows && sentRows.length > 0);
+      if (tRow && !hasInbound && !hasSent) {
+        const curMeta = cleanMeta(tRow.metadata || {});
+        if (curMeta.wa_lead_status_override !== true) {
+          await supabase
+            .from('tickets')
+            .update({
+              updated_at: nowIso,
+              metadata: {
+                ...curMeta,
+                wa_delivery_error: 'Sin cuenta de WhatsApp',
+                wa_lead_status: 'Erróneo',
+                ai_qualifier_active: false,
+                wa_attended_at: nowIso,
+              },
+            })
+            .eq('id', tRow.id);
+
+          if (tRow.lead_id) {
+            const { data: ld } = await supabase
+              .from('leads')
+              .select('id, status')
+              .eq('id', tRow.lead_id)
+              .maybeSingle();
+            const curLeadStatus = String(ld?.status || '').trim();
+            if (ld && ['', 'Prospecto', 'Llamada fría', 'En Nutrición'].includes(curLeadStatus)) {
+              await supabase
+                .from('leads')
+                .update({ status: 'Erróneo', updated_at: nowIso })
+                .eq('id', ld.id);
+              await supabase
+                .from('lead_qualifier_sessions')
+                .update({
+                  status: 'closed_discarded',
+                  handoff_reason: 'Número sin cuenta de WhatsApp (exists:false)',
+                  handoff_at: nowIso,
+                })
+                .eq('company_id', tRow.company_id)
+                .eq('lead_id', ld.id)
+                .in('status', ['active', 'pending_first_touch', 'waiting_reply']);
+            }
+          }
+        }
+      }
+    } catch (syncErr) {
+      console.warn('[handleBridgeAck] failed syncing Erróneo state:', syncErr);
+    }
+  }
+
   if (sentId && ob.comment_id && ob.ticket_id) {
     // Link the WhatsApp id to the chat line so the fromMe echo is recognised as a duplicate.
     const { data: linked } = await supabase

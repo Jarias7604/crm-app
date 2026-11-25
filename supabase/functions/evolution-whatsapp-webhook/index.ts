@@ -697,7 +697,7 @@ serve(async (req: Request) => {
     const uiActions = [
       'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel',
       'draft_technical_ticket', 'set_technical_ticket', 'cleanup_auto_junk_tickets',
-      'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'send_reactivation',
+      'promote_to_lead', 'classify_contact', 'update_lead_status', 'send_reply', 'send_media', 'send_reactivation',
       'retry_media', 'bridge_status', 'rescope_now', 'request_history_import', 'request_evo_heal',
       'get_wa_team_access', 'set_wa_user_access', 'set_qualifier_thread_state',
     ];
@@ -733,6 +733,8 @@ serve(async (req: Request) => {
           return await handleClassify(supabase, caller, { ...payload, contact_type: 'lead' });
         case 'classify_contact':
           return await handleClassify(supabase, caller, payload);
+        case 'update_lead_status':
+          return await handleUpdateLeadStatusServer(supabase, caller, payload);
         case 'send_reply':
           await pauseQualifierOnHumanReply(supabase, payload?.ticket_id, caller.fullName);
           return await handleSendReply(supabase, caller, payload);
@@ -782,6 +784,122 @@ serve(async (req: Request) => {
 // =============================================================================
 // Sales Lead Qualifier controls & takeover helpers
 // =============================================================================
+
+const ALLOWED_SYNC_LEAD_STATUSES = new Set([
+  'Prospecto',
+  'Llamada fría',
+  'En Nutrición',
+  'Lead calificado',
+  'En seguimiento',
+  'Cotizado',
+  'Negociación',
+  'En Negociación',
+  'Cerrado',
+  'Cliente',
+  'Perdido',
+  'Erróneo',
+]);
+
+async function handleUpdateLeadStatusServer(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const ticketId = String(payload?.ticket_id || '').trim();
+  const newStatus = String(payload?.status || '').trim();
+  if (!ticketId || !ALLOWED_SYNC_LEAD_STATUSES.has(newStatus)) {
+    return json({ ok: false, error: 'Datos inválidos (ticket_id o status no permitido)' }, 400);
+  }
+  if (!(await ticketVisibleTo(caller, ticketId))) {
+    return json({ ok: false, error: 'No tienes acceso a este chat' }, 403);
+  }
+
+  const { data: ticket, error: tErr } = await supabase
+    .from('tickets')
+    .select('id, company_id, lead_id, metadata')
+    .eq('id', ticketId)
+    .maybeSingle();
+  if (tErr || !ticket) return json({ ok: false, error: 'Chat no encontrado' }, 404);
+
+  const nowIso = new Date().toISOString();
+  const meta = cleanMeta(ticket.metadata || {});
+  const phoneDigits = String(meta.whatsapp_phone || '').replace(/\D/g, '');
+  let targetLeadId = String(payload?.lead_id || ticket.lead_id || '').trim() || null;
+
+  if (!targetLeadId && phoneDigits.length >= 8) {
+    const tail8 = phoneDigits.slice(-8);
+    const { data: candidateLeads } = await supabase
+      .from('leads')
+      .select('id, phone')
+      .eq('company_id', ticket.company_id)
+      .ilike('phone', `%${tail8}%`)
+      .limit(10);
+    const matched = (candidateLeads || []).find(
+      (l: any) => String(l.phone || '').replace(/\D/g, '').slice(-8) === tail8
+    );
+    if (matched?.id) targetLeadId = String(matched.id);
+  }
+
+  if (targetLeadId) {
+    const { data: updatedLead, error: lErr } = await supabase
+      .from('leads')
+      .update({ status: newStatus, updated_at: nowIso })
+      .eq('id', targetLeadId)
+      .eq('company_id', ticket.company_id)
+      .select('id, status')
+      .maybeSingle();
+    if (lErr) return json({ ok: false, error: lErr.message }, 500);
+    if (!updatedLead) return json({ ok: false, error: 'Lead no encontrado en la empresa' }, 404);
+  }
+
+  const isDiscard = newStatus === 'Perdido' || newStatus === 'Erróneo';
+  const pauseAi = isDiscard || newStatus === 'Cliente' || newStatus === 'Cerrado';
+
+  const { data: relatedTickets } = targetLeadId
+    ? await supabase
+        .from('tickets')
+        .select('id, lead_id, metadata')
+        .eq('company_id', ticket.company_id)
+        .or(`id.eq.${ticketId},lead_id.eq.${targetLeadId}`)
+    : await supabase.from('tickets').select('id, lead_id, metadata').eq('id', ticketId);
+
+  for (const rt of relatedTickets || [ticket]) {
+    const rtMeta = cleanMeta(rt.metadata || {});
+    const nextMeta: Record<string, any> = {
+      ...rtMeta,
+      ...(rtMeta.wa_scope === 'por_clasificar' ? { wa_scope: 'lead' } : {}),
+      wa_lead_status: newStatus,
+      wa_lead_status_override: true,
+      ...(isDiscard ? { wa_attended_at: nowIso } : {}),
+      ...(pauseAi ? { ai_qualifier_active: false } : {}),
+    };
+    if (newStatus !== 'Erróneo') {
+      delete nextMeta.wa_delivery_error;
+    }
+    const patch: Record<string, any> = { metadata: nextMeta, updated_at: nowIso };
+    if (targetLeadId && !rt.lead_id) patch.lead_id = targetLeadId;
+    await supabase.from('tickets').update(patch).eq('id', rt.id);
+  }
+
+  if (pauseAi && targetLeadId) {
+    await supabase
+      .from('lead_qualifier_sessions')
+      .update({
+        status: 'closed_discarded',
+        handoff_reason: `Etapa cambiada a ${newStatus} por ${caller.fullName}`,
+        handoff_at: nowIso,
+      })
+      .eq('company_id', ticket.company_id)
+      .eq('lead_id', targetLeadId)
+      .in('status', ['active', 'pending_first_touch', 'waiting_reply']);
+  }
+
+  await supabase.from('ticket_comments').insert({
+    ticket_id: ticketId,
+    company_id: ticket.company_id,
+    author_id: caller.userId,
+    body: `${caller.fullName} actualizó etapa del lead a: ${newStatus}`,
+    is_internal: true,
+  });
+
+  return json({ ok: true, lead_id: targetLeadId, status: newStatus });
+}
 
 async function pauseQualifierOnHumanReply(supabase: any, ticketId: string | undefined, actorName: string) {
   if (!ticketId) return;
