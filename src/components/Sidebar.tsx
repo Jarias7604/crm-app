@@ -9,7 +9,6 @@ import { brandingService } from '../services/branding';
 import { supabase } from '../services/supabase';
 import type { Company } from '../types';
 import toast from 'react-hot-toast';
-import { prefetchConversations } from '../services/marketing/chatCache';
 import { getWaViewerScopes } from '../lib/whatsappScopes';
 
 
@@ -509,14 +508,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             icon: Headset,
             current: location.pathname.startsWith('/support'),
             subItems: [
-                ...(waScopes.any ? [{ name: 'Chat WhatsApp', href: '/support/chat', icon: MessageSquare }] : []),
+                ...(waScopes.any || canAccess('chat') ? [{ name: 'Chat WhatsApp', href: '/support/chat', icon: MessageSquare }] : []),
                 { name: t('sidebar.tickets'), href: '/support/tickets', icon: TicketIcon },
                 { name: 'Inteligencia & QA (IA)', href: '/support/intelligence', icon: Brain },
                 { name: t('sidebar.overdue'), href: '/support/atrasados', icon: AlertTriangle },
                 { name: t('sidebar.manualCrm'), href: '/support/manual', icon: BookOpen },
             ]
         });
-    } else if (waScopes.any) {
+    } else if (waScopes.any || canAccess('chat')) {
         // Sales users without Service Hub: only the WhatsApp chat (their leads + unclassified numbers).
         navigation.push({
             name: 'Chat WhatsApp',
@@ -559,17 +558,6 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 { name: t('sidebar.connectedAccounts') || 'Cuentas Conectadas', href: '/company/social-accounts', icon: Network },
             ]
         });
-    }
-
-    if (canAccess('chat')) {
-        navigation.push({
-            name: t('sidebar.messages'),
-            href: '/marketing/chat',
-            icon: MessageSquare,
-            current: location.pathname.startsWith('/marketing/chat'),
-            // Hover prefetch: starts data loading before user clicks
-            onHover: () => prefetchConversations(profile?.company_id)
-        } as any);
     }
 
     const configSubItemsRaw = [

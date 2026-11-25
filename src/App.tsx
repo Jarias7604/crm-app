@@ -46,7 +46,6 @@ const PredictiveBoard   = lazy(() => import('./pages/marketing/PredictiveBoard')
 const DataHygiene       = lazy(() => import('./pages/marketing/DataHygiene'));
 const AgentNetworkMap   = lazy(() => import('./pages/marketing/AgentNetworkMap'));
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
-const ChatHub           = lazy(() => import('./pages/marketing/ChatHub'));
 const PublicQuoteView   = lazy(() => import('./pages/PublicQuoteView'));
 const PublicContractView= lazy(() => import('./pages/public/PublicContractView'));
 const PublicInvoiceView = lazy(() => import('./pages/PublicInvoiceView'));
@@ -302,9 +301,7 @@ function App() {
                     <Route path="/marketing/agent-network" element={<AgentNetworkMap />} />
                   </Route>
 
-                  <Route element={<FeatureProtectedRoute feature="chat" />}>
-                    <Route path="/marketing/chat" element={<ChatHub />} />
-                  </Route>
+                  <Route path="/marketing/chat" element={<Navigate to="/support/chat" replace />} />
 
                   {/* Clientes Module */}
                   <Route element={<FeatureProtectedRoute feature="clientes" />}>

@@ -704,3 +704,33 @@ export function isCourtesyClosingMessage(text: string): boolean {
   if (COURTESY_BLOCK_RE.test(norm)) return false;
   return COURTESY_THANKS_RE.test(norm) || COURTESY_ACK_RE.test(norm);
 }
+
+export interface QuotedReplyRef {
+  id: string;
+  senderName: string;
+  text: string;
+}
+
+export function formatQuotedReplyText(reply: QuotedReplyRef | null | undefined, body: string): string {
+  const cleanBody = String(body || '').trim();
+  if (!reply || !cleanBody) return cleanBody;
+  const sender = String(reply.senderName || 'Contacto').replace(/[\r\n:]+/g, ' ').trim().slice(0, 50) || 'Contacto';
+  const rawSnippet = String(reply.text || '').replace(/\s+/g, ' ').trim();
+  const snippet = rawSnippet.length > 120 ? `${rawSnippet.slice(0, 117)}...` : rawSnippet || '[Mensaje]';
+  return `> ${sender}: ${snippet}\n\n${cleanBody}`;
+}
+
+export function parseQuotedReplyPrefix(rawText: string): { quote: { author: string; text: string } | null; body: string } {
+  const raw = String(rawText || '');
+  const m = raw.match(/^>\s*([^:\n]{1,60}):\s*([^\n]+)\n+([\s\S]*)$/);
+  if (!m) {
+    return { quote: null, body: raw };
+  }
+  const author = m[1].trim();
+  const text = m[2].trim();
+  const body = m[3].trim();
+  if (!author || !body) {
+    return { quote: null, body: raw };
+  }
+  return { quote: { author, text }, body };
+}

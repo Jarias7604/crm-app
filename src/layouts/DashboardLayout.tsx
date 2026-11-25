@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import MobileNav from '../components/MobileNav';
@@ -13,9 +13,25 @@ import { useSessionTimeout } from '../hooks/useSessionTimeout';
 export default function DashboardLayout() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [mobileChatFullscreen, setMobileChatFullscreen] = useState(false);
     const { profile } = useAuth();
     const { t, i18n } = useTranslation();
     const location = useLocation();
+
+    useEffect(() => {
+        if (!location.pathname.startsWith('/support/chat')) {
+            setMobileChatFullscreen(false);
+        }
+    }, [location.pathname]);
+
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<boolean>).detail;
+            setMobileChatFullscreen(Boolean(detail));
+        };
+        window.addEventListener('arias:mobile-chat-open', handler);
+        return () => window.removeEventListener('arias:mobile-chat-open', handler);
+    }, []);
 
     // Check if we are in an immersive page (no global header or container padding/max-width)
     // NOTE: Only ChatHub needs the locked h-screen/overflow-hidden layout.
@@ -41,7 +57,9 @@ export default function DashboardLayout() {
             <div className={cn(
                 "transition-all duration-300 ease-in-out flex flex-col w-full max-w-full overflow-x-hidden",
                 isImmersiveView
-                    ? "h-screen overflow-hidden pb-16 md:pb-0"
+                    ? mobileChatFullscreen
+                        ? "h-[100dvh] overflow-hidden pb-0 md:pb-0"
+                        : "h-[100dvh] overflow-hidden pb-16 md:pb-0"
                     : "min-h-screen pb-20 md:pb-0",
                 sidebarCollapsed ? "md:pl-20" : "md:pl-64"
             )}>

@@ -61,6 +61,8 @@ import {
   Pause,
   Play,
   Ticket as TicketIcon,
+  CornerUpLeft,
+  MoreVertical,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -162,6 +164,9 @@ import {
   matchesCircleBucketAndTray,
   matchesCircleStateFilters,
   isCourtesyClosingMessage,
+  formatQuotedReplyText,
+  parseQuotedReplyPrefix,
+  type QuotedReplyRef,
 } from './whatsapp/helpers';
 import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
 import { ChatComposer, type ChatComposerHandle } from './whatsapp/ChatComposer';
@@ -579,6 +584,34 @@ export const SupportChatCircles: React.FC = () => {
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [leftListCollapsed, setLeftListCollapsed] = useState(false);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [replyingToMessage, setReplyingToMessage] = useState<QuotedReplyRef | null>(null);
+  const [showMobileActionsSheet, setShowMobileActionsSheet] = useState(false);
+
+  useEffect(() => {
+    setSelectedMessageId(null);
+    setReplyingToMessage(null);
+    setShowMobileActionsSheet(false);
+  }, [selectedCircleId]);
+
+  useEffect(() => {
+    const isOpen = Boolean(mobileChatOpen && selectedCircleId);
+    window.dispatchEvent(new CustomEvent('arias:mobile-chat-open', { detail: isOpen }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('arias:mobile-chat-open', { detail: false }));
+    };
+  }, [mobileChatOpen, selectedCircleId]);
+
+  useEffect(() => {
+    if (!mobileChatOpen || typeof window === 'undefined' || !window.visualViewport) return;
+    const handleViewportResize = () => {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      });
+    };
+    window.visualViewport.addEventListener('resize', handleViewportResize);
+    return () => window.visualViewport?.removeEventListener('resize', handleViewportResize);
+  }, [mobileChatOpen]);
 
   // Resizable left column
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
@@ -2113,8 +2146,9 @@ export const SupportChatCircles: React.FC = () => {
   );
 
   const handleSendReply = async (customText: string): Promise<boolean> => {
-    const textToSend = String(customText || '').trim();
-    if (!textToSend || !activeCircle || !activeCompanyId || !canSend) return false;
+    const cleanInput = String(customText || '').trim();
+    if (!cleanInput || !activeCircle || !activeCompanyId || !canSend) return false;
+    const textToSend = formatQuotedReplyText(replyingToMessage, cleanInput);
     markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt, activeCircle.activeTicket.id);
     const t = activeCircle.activeTicket;
     const nowIso = new Date().toISOString();
@@ -2143,6 +2177,7 @@ export const SupportChatCircles: React.FC = () => {
       if (data?.comment) {
         setComments((prev) => prev.map((c) => (c.id === optimistic.id ? (data.comment as TicketComment) : c)));
       }
+      setReplyingToMessage(null);
       const replyIso = String((data?.comment as TicketComment | undefined)?.created_at || new Date().toISOString());
       markCircleAsRead(activeCircle.circleId, replyIso, t.id);
       setTickets((prev) =>
@@ -2153,7 +2188,7 @@ export const SupportChatCircles: React.FC = () => {
                 updated_at: replyIso,
                 metadata: {
                   ...((row.metadata || {}) as Record<string, unknown>),
-                  last_whatsapp_message: textToSend,
+                  last_whatsapp_message: cleanInput,
                   last_message_from: 'staff',
                   last_whatsapp_at: replyIso,
                 },
@@ -3317,9 +3352,13 @@ export const SupportChatCircles: React.FC = () => {
   const roleChip = scopes.all ? 'ADMIN' : scopes.soporte && scopes.leads ? 'SOPORTE + VENTAS' : scopes.soporte ? 'SOPORTE' : 'VENTAS';
 
   return (
-    <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
-      {/* ── TOP HEADER (100% Light & Vector Clean) ── */}
-      <header className="h-12 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
+    <div className="h-full flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
+      {/* ── TOP HEADER (100% Light & Vector Clean; hidden on mobile when inside an active chat) ── */}
+      <header
+        className={`h-12 bg-white border-b border-slate-200/80 px-3.5 md:px-5 items-center justify-between shrink-0 z-30 relative ${
+          mobileChatOpen && activeCircle ? 'hidden lg:flex' : 'flex'
+        }`}
+      >
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4.5 rounded-full bg-indigo-600" />
@@ -3357,7 +3396,7 @@ export const SupportChatCircles: React.FC = () => {
             type="button"
             onClick={toggleSound}
             title={soundEnabled ? 'Alarma sonora activada (clic para silenciar)' : 'Alarma silenciada (clic para activar y probar)'}
-            className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-600 transition"
+            className="hidden sm:inline-flex p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-600 transition"
           >
             {soundEnabled ? <Volume2 className="w-4 h-4 text-indigo-600" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
           </button>
@@ -3368,14 +3407,14 @@ export const SupportChatCircles: React.FC = () => {
               type="button"
               onClick={() => setShowAlertsPopover((v) => !v)}
               title="Centro de Alertas y Seguimiento"
-              className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-[13px] font-semibold transition"
+              className="relative inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-[13px] font-semibold transition"
             >
               {alertCircles.total > 0 || bellRinging ? (
                 <BellRing className={`w-4 h-4 text-indigo-600 ${bellRinging ? 'animate-bounce' : ''}`} />
               ) : (
                 <Bell className="w-4 h-4 text-slate-500" />
               )}
-              <span>Alertas</span>
+              <span className="hidden sm:inline">Alertas</span>
               {alertCircles.total > 0 && (
                 <span
                   className={`px-1.5 py-0.2 rounded-full text-[11px] font-bold border ${
@@ -3677,7 +3716,7 @@ export const SupportChatCircles: React.FC = () => {
                 type="button"
                 onClick={openTeamAccessModal}
                 title="Configurar qué ven los Técnicos, los Vendedores y los Administradores"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
               >
                 <ShieldCheck className="w-4 h-4 text-indigo-600" />
                 <span>Accesos</span>
@@ -3693,7 +3732,7 @@ export const SupportChatCircles: React.FC = () => {
                     verifyAndLoadAiConfig(false);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-700 border border-indigo-200/60 transition"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-700 border border-indigo-200/60 transition"
               >
                 <Sparkles className="w-4 h-4 text-indigo-600" />
                 <span>IA</span>
@@ -3709,7 +3748,7 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 onClick={openBridgeStatus}
                 title="Estado de la conexión WhatsApp"
-                className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition"
+                className="hidden md:inline-flex p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition"
               >
                 <Settings className="w-4 h-4" />
               </button>
@@ -3783,7 +3822,7 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 onClick={() => loadSupportData(false, true)}
                 title={`Actualizar (${filteredCircles.length} conversaciones)`}
-                className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
+                className="hidden md:flex p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 items-center justify-center transition shrink-0"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
               </button>
@@ -3911,8 +3950,8 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             )}
 
-            {/* Row 1: Bandejas (multi-selección combinable) */}
-            <div className="flex items-center gap-1 flex-wrap">
+            {/* Row 1: Bandejas (1 sola fila deslizable en móvil; multi-selección en desktop) */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 md:pb-0 md:flex-wrap">
               <button
                 type="button"
                 onClick={() => {
@@ -3920,13 +3959,27 @@ export const SupportChatCircles: React.FC = () => {
                   setSelectedBuckets([]);
                   setLeadSubFilter('activos');
                 }}
-                className={`px-2 py-1 rounded-lg text-[12px] whitespace-nowrap transition ${
-                  specialTray === null && selectedBuckets.length === 0
-                    ? 'bg-indigo-50 text-indigo-700 font-bold'
+                className={`px-2.5 md:px-2 py-1 rounded-full md:rounded-lg text-[12px] whitespace-nowrap transition shrink-0 ${
+                  specialTray === null && selectedBuckets.length === 0 && !stateFilters.includes('waiting')
+                    ? 'bg-slate-900 md:bg-indigo-50 text-white md:text-indigo-700 font-bold'
                     : 'text-slate-600 hover:bg-slate-50 font-medium'
                 }`}
               >
                 Todos ({counts.all})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                  setStateFilters((prev) => toggleStateFilterSelection(prev, 'waiting'));
+                }}
+                className={`md:hidden px-2.5 py-1 rounded-full text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
+                  stateFilters.includes('waiting')
+                    ? 'bg-indigo-600 text-white font-bold'
+                    : 'bg-slate-100 text-slate-700 font-medium'
+                }`}
+              >
+                <span>Sin contestar ({contextCounts.waiting})</span>
               </button>
               {bucketTabs.map((tab) => {
                 const active = specialTray === null && selectedBuckets.includes(tab.id);
@@ -3939,7 +3992,7 @@ export const SupportChatCircles: React.FC = () => {
                       setLeadSubFilter('activos');
                       setSelectedBuckets((prev) => toggleBucketSelection(prev, tab.id));
                     }}
-                    className={`px-2 py-1 rounded-lg text-[12px] whitespace-nowrap transition inline-flex items-center gap-1 ${
+                    className={`px-2.5 md:px-2 py-1 rounded-full md:rounded-lg text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -3954,7 +4007,7 @@ export const SupportChatCircles: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSpecialTray(null)}
-                  className="px-2 py-1 rounded-lg text-[12px] whitespace-nowrap bg-indigo-50 text-indigo-700 font-bold inline-flex items-center gap-1"
+                  className="px-2 py-1 rounded-lg text-[12px] whitespace-nowrap shrink-0 bg-indigo-50 text-indigo-700 font-bold inline-flex items-center gap-1"
                 >
                   <span>
                     {specialTray === 'interno'
@@ -3968,8 +4021,8 @@ export const SupportChatCircles: React.FC = () => {
               )}
             </div>
 
-            {/* Row 2: Estados de atención combinables (contadores del contexto actual) */}
-            <div className="flex items-center gap-1 flex-wrap">
+            {/* Row 2: Estados de atención combinables (solo desktop; móvil usa 1 fila aireada) */}
+            <div className="hidden md:flex items-center gap-1 flex-wrap">
               {(
                 [
                   { id: 'unopened' as CircleStateFilter, label: `Sin abrir (${contextCounts.unopened})`, count: contextCounts.unopened, primary: true },
@@ -4188,8 +4241,8 @@ export const SupportChatCircles: React.FC = () => {
               mobileChatOpen ? 'flex' : 'hidden lg:flex'
             }`}
           >
-            {/* Chat header (Clean 1-Bar Desktop & Adaptive Tablet Header) */}
-            <div className="bg-white border-b border-slate-200/70 px-3.5 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
+            {/* Chat header (Clean 54px Mobile Native Header & 1-Bar Desktop Header) */}
+            <div className="h-[54px] md:h-auto bg-white border-b border-slate-200/70 px-2.5 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                 {/* Tablet / Mobile Back to List Button */}
                 <button
@@ -4226,11 +4279,15 @@ export const SupportChatCircles: React.FC = () => {
                     <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[180px] sm:max-w-[240px] 2xl:max-w-[300px]">
                       {activeCircle.clientName}
                     </h3>
-                    {activeCircle.scope !== 'lead' && <ScopeChip circle={activeCircle} compact />}
+                    {activeCircle.scope !== 'lead' && (
+                      <span className="hidden md:inline-flex">
+                        <ScopeChip circle={activeCircle} compact />
+                      </span>
+                    )}
                     {activeCircle.isReactivation && (
                       <span
                         title={activeCircle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border shrink-0 ${
+                        className={`hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border shrink-0 ${
                           activeCircle.reactivationReplied
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                             : 'bg-indigo-50/70 text-indigo-700 border-indigo-200/80'
@@ -4243,7 +4300,7 @@ export const SupportChatCircles: React.FC = () => {
                     {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes >= 15 && activeCircle.waitMinutes <= 24 * 60 && (
                       <span
                         title={`Esperando respuesta hace ${formatWaitDuration(activeCircle.waitMinutes)}`}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80 shrink-0"
+                        className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80 shrink-0"
                       >
                         <Clock className="w-2.5 h-2.5" />
                         <span>{formatWaitDuration(activeCircle.waitMinutes)}</span>
@@ -4254,7 +4311,7 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         onClick={() => handleMarkCircleAttended(activeCircle)}
                         title="Marcar conversación como ya atendida (quita la alerta de espera)"
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition shrink-0"
+                        className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition shrink-0"
                       >
                         <CheckCircle2 className="w-2.5 h-2.5" />
                         <span>Atendido</span>
@@ -4268,7 +4325,7 @@ export const SupportChatCircles: React.FC = () => {
                           setShowRootCausePopover((v) => !v);
                         }}
                         title="Clasificar Causa Raíz o escalar Bug de sistema a Jimmy"
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border transition shrink-0 ${
+                        className={`hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border transition shrink-0 ${
                           latestActiveRootCause && !latestActiveRootCause.dev_resolved_at
                             ? SUPPORT_ROOT_CAUSE_META[latestActiveRootCause.type].badgeClass
                             : 'bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-200/80'
@@ -4286,7 +4343,7 @@ export const SupportChatCircles: React.FC = () => {
                       type="button"
                       onClick={() => handleMarkCircleUnread(activeCircle)}
                       title="Devolver conversación a No leído (Nuevo / Sin contestar)"
-                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border transition shrink-0 ${
+                      className={`hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border transition shrink-0 ${
                         isUnread(activeCircle)
                           ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                           : 'bg-slate-100/90 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border-slate-200/80'
@@ -4340,12 +4397,22 @@ export const SupportChatCircles: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-end gap-1.5 shrink-0 ml-auto">
-                {/* Support area selector + ticket status + quick tech assignment */}
+                {/* Mobile Single ⋮ Action Sheet Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setShowMobileActionsSheet(true)}
+                  title="Acciones rápidas en móvil"
+                  className="md:hidden w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center transition"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+
+                {/* Support area selector + ticket status + quick tech assignment (Desktop/Tablet) */}
                 {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (() => {
                   const isTechTicket = isSupportTicket(activeCircle.activeTicket);
                   const isClosed = ['resolved', 'closed'].includes(activeCircle.activeTicket.status);
                   return (
-                    <>
+                    <div className="hidden md:flex items-center gap-1.5">
                       {isTechTicket ? (
                         <span
                           title="Ticket técnico activo en Service Hub"
@@ -4409,7 +4476,7 @@ export const SupportChatCircles: React.FC = () => {
                           Tomar caso
                         </button>
                       )}
-                    </>
+                    </div>
                   );
                 })()}
 
@@ -4419,8 +4486,8 @@ export const SupportChatCircles: React.FC = () => {
                   (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') &&
                   (scopes.all || scopes.leads) && (
                     <>
-                      {/* Single Clean Custom Dropdown for Lead Stage (No duplicate quick buttons next to it!) */}
-                      <div className="relative">
+                      {/* Single Clean Custom Dropdown for Lead Stage (Desktop/Tablet; mobile uses ⋮ sheet) */}
+                      <div className="relative hidden md:block">
                         <button
                           type="button"
                           onClick={() => {
@@ -4793,9 +4860,9 @@ export const SupportChatCircles: React.FC = () => {
                     </>
                   )}
 
-                {/* Unified More Options Popover (Always accessible, including on Por Clasificar) */}
+                {/* Unified More Options Popover (Desktop/Tablet; mobile uses ⋮ sheet) */}
                 {(canClassify || activeCircle.leadId) && (
-                  <div className="relative">
+                  <div className="relative hidden md:block">
                     <button
                       type="button"
                       onClick={() => setShowReclassifyMenu((v) => !v)}
@@ -4895,7 +4962,7 @@ export const SupportChatCircles: React.FC = () => {
                     type="button"
                     onClick={() => setShowRightPanel(!showRightPanel)}
                     title="Panel del ticket: asignar técnico, tiempo y cierre"
-                    className={`w-9 h-8 rounded-xl flex items-center justify-center border transition ${
+                    className={`hidden md:flex w-9 h-8 rounded-xl items-center justify-center border transition ${
                       showRightPanel
                         ? 'bg-indigo-600 text-white border-indigo-600'
                         : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
@@ -4967,7 +5034,7 @@ export const SupportChatCircles: React.FC = () => {
                 const qStatus = String(qMeta.ai_qualifier_status || (isQActive ? 'active' : 'paused'));
                 return (
                   <div
-                    className={`px-4 py-1.5 border-b flex items-center justify-between gap-2 flex-wrap shrink-0 text-xs ${
+                    className={`hidden md:flex px-4 py-1.5 border-b items-center justify-between gap-2 flex-wrap shrink-0 text-xs ${
                       qStatus === 'handed_off'
                         ? 'bg-rose-50 border-rose-200 text-rose-900'
                         : isQActive
@@ -4979,14 +5046,14 @@ export const SupportChatCircles: React.FC = () => {
                       <Bot className="w-3.5 h-3.5 shrink-0" />
                       <span className="font-bold truncate">
                         {qStatus === 'handed_off'
-                          ? '🙋 Lead solicitó hablar con un asesor humano'
+                          ? 'Lead solicitó hablar con un asesor humano'
                           : qStatus === 'demo_booked'
-                          ? '📅 Demo agendada automáticamente por IA'
+                          ? 'Demo agendada automáticamente por IA'
                           : qStatus === 'human_takeover'
-                          ? '👤 Asesor humano tomó control (IA pausada)'
+                          ? 'Asesor humano tomó control (IA pausada)'
                           : isQActive
-                          ? '🤖 Calificador IA Activo (si respondes tú, se pausa solo)'
-                          : '⏸ Calificador IA Pausado en esta conversación'}
+                          ? 'Calificador IA Activo (si respondes tú, se pausa solo)'
+                          : 'Calificador IA Pausado en esta conversación'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -5025,7 +5092,12 @@ export const SupportChatCircles: React.FC = () => {
               })()}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-3">
+            <div
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedMessageId(null);
+              }}
+              className="flex-1 overflow-y-auto px-3 py-4 md:px-8 md:py-6 space-y-3"
+            >
               {loadingComments ? (
                 <div className="text-center py-12 text-[13px] font-medium text-slate-400">Cargando mensajes…</div>
               ) : chatItems.length === 0 ? (
@@ -5121,106 +5193,246 @@ export const SupportChatCircles: React.FC = () => {
                   }
                   if (b.kind === 'staff') {
                     const isEditing = editingCommentId === b.id;
+                    const isSelected = selectedMessageId === b.id && !isEditing;
+                    const parsedStaff = parseQuotedReplyPrefix(b.text || '');
                     return (
                       <React.Fragment key={b.id}>
                         {daySep}
-                        <div className="flex justify-end items-start gap-1.5 group/msg">
-                          {canModifyComment(b) && !isEditing && (
-                            <div className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 bg-white border border-slate-200/90 rounded-xl px-1.5 py-1 shadow-2xs self-center">
-                              <button
-                                type="button"
-                                onClick={() => handleStartEditComment(b)}
-                                title="Editar mensaje"
-                                className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteComment(b)}
-                                title="Eliminar mensaje"
-                                className="p-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                          <div className="max-w-lg bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-3 shadow-2xs">
-                            <p className="text-[12.5px] font-semibold text-indigo-700/85 mb-0.5">{b.senderName}</p>
-                            {renderMedia(b)}
-                            {isEditing ? (
-                              <div className="mt-1.5 space-y-2 min-w-[280px] sm:min-w-[360px]">
-                                <textarea
-                                  rows={4}
-                                  value={editingCommentText}
-                                  onChange={(e) => setEditingCommentText(e.target.value)}
-                                  className="w-full px-3 py-2 rounded-xl bg-white border border-indigo-200 text-[13.5px] font-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
-                                />
-                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        <div className="flex flex-col items-end group/msg">
+                          <div className="flex justify-end items-start gap-1.5 w-full">
+                            {!isEditing && (
+                              <div className="hidden md:flex opacity-0 group-hover/msg:opacity-100 transition-opacity items-center gap-1 bg-white border border-slate-200/90 rounded-xl px-1.5 py-1 shadow-2xs self-center">
+                                {canSend && parsedStaff.body && (
                                   <button
                                     type="button"
-                                    onClick={() => setEditingCommentId(null)}
-                                    className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-slate-600 text-xs font-semibold transition"
+                                    onClick={() => {
+                                      setReplyingToMessage({ id: b.id, senderName: b.senderName, text: parsedStaff.body });
+                                      composerRef.current?.setDraft('', 'whatsapp');
+                                    }}
+                                    title="Responder citando este mensaje"
+                                    className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
                                   >
-                                    Cancelar
+                                    <CornerUpLeft className="w-3.5 h-3.5" />
                                   </button>
-                                  <button
-                                    type="button"
-                                    disabled={savingCommentEdit || !editingCommentText.trim()}
-                                    onClick={() => handleSaveEditedComment(b, false)}
-                                    className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-xs font-bold disabled:opacity-50 transition"
-                                  >
-                                    Guardar en chat
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={savingCommentEdit || !editingCommentText.trim()}
-                                    onClick={() => handleSaveEditedComment(b, true)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-50 transition"
-                                  >
-                                    <Send className="w-3 h-3" />
-                                    Guardar y reenviar a WhatsApp
-                                  </button>
-                                </div>
+                                )}
+                                {canModifyComment(b) && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditComment(b)}
+                                      title="Editar mensaje"
+                                      className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteComment(b)}
+                                      title="Eliminar mensaje"
+                                      className="p-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
-                            ) : (
-                              b.text && <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>
                             )}
-                            <div className="flex items-center justify-end gap-1 mt-1">
-                              <span className="text-xs font-normal text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
-                              {b.delivery === 'sent' ? (
-                                <CheckCheck className="w-3.5 h-3.5 text-emerald-500" aria-label="Entregado a WhatsApp" />
-                              ) : b.delivery === 'error' ? (
-                                <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-xs font-bold text-rose-600">
-                                  <AlertTriangle className="w-3 h-3" /> No enviado
-                                </span>
-                              ) : b.delivery ? (
-                                <Check className="w-3.5 h-3.5 text-slate-400" aria-label="En cola de envío" />
-                              ) : null}
+                            <div
+                              onClick={() => {
+                                if (!isEditing) setSelectedMessageId((prev) => (prev === b.id ? null : b.id));
+                              }}
+                              className={`max-w-[85%] md:max-w-lg bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-3.5 py-2.5 md:px-4 md:py-3 shadow-2xs transition cursor-pointer ${
+                                isSelected ? 'ring-2 ring-indigo-400 ring-offset-1' : ''
+                              }`}
+                            >
+                              <p className="text-[12.5px] font-semibold text-indigo-700/85 mb-0.5">{b.senderName}</p>
+                              {renderMedia(b)}
+                              {isEditing ? (
+                                <div className="mt-1.5 space-y-2 min-w-0 w-full sm:min-w-[340px]" onClick={(e) => e.stopPropagation()}>
+                                  <textarea
+                                    rows={4}
+                                    value={editingCommentText}
+                                    onChange={(e) => setEditingCommentText(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-xl bg-white border border-indigo-200 text-[13.5px] font-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+                                  />
+                                  <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingCommentId(null)}
+                                      className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-slate-600 text-xs font-semibold transition"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={savingCommentEdit || !editingCommentText.trim()}
+                                      onClick={() => handleSaveEditedComment(b, false)}
+                                      className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-xs font-bold disabled:opacity-50 transition"
+                                    >
+                                      Guardar en chat
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={savingCommentEdit || !editingCommentText.trim()}
+                                      onClick={() => handleSaveEditedComment(b, true)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-50 transition"
+                                    >
+                                      <Send className="w-3 h-3" />
+                                      Guardar y reenviar a WhatsApp
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  {parsedStaff.quote && (
+                                    <div className="mb-1.5 px-2.5 py-1.5 rounded-xl bg-white/60 border-l-2 border-indigo-600 text-slate-700">
+                                      <p className="text-[11px] font-bold text-indigo-700 truncate">{parsedStaff.quote.author}</p>
+                                      <p className="text-[11.5px] text-slate-600 line-clamp-2">{parsedStaff.quote.text}</p>
+                                    </div>
+                                  )}
+                                  {parsedStaff.body && (
+                                    <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">
+                                      {parsedStaff.body}
+                                    </p>
+                                  )}
+                                </>
+                              )}
+                              <div className="flex items-center justify-end gap-1 mt-1">
+                                <span className="text-xs font-normal text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
+                                {b.delivery === 'sent' ? (
+                                  <CheckCheck className="w-3.5 h-3.5 text-emerald-500" aria-label="Entregado a WhatsApp" />
+                                ) : b.delivery === 'error' ? (
+                                  <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-xs font-bold text-rose-600">
+                                    <AlertTriangle className="w-3 h-3" /> No enviado
+                                  </span>
+                                ) : b.delivery ? (
+                                  <Check className="w-3.5 h-3.5 text-slate-400" aria-label="En cola de envío" />
+                                ) : null}
+                              </div>
                             </div>
                           </div>
+                          {isSelected && (
+                            <div className="mt-1.5 inline-flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2 py-1 shadow-md z-20">
+                              {canSend && parsedStaff.body && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedMessageId(null);
+                                    setReplyingToMessage({ id: b.id, senderName: b.senderName, text: parsedStaff.body });
+                                    composerRef.current?.setDraft('', 'whatsapp');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-semibold transition"
+                                >
+                                  <CornerUpLeft className="w-3.5 h-3.5" />
+                                  <span>Responder</span>
+                                </button>
+                              )}
+                              {canModifyComment(b) && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedMessageId(null);
+                                      handleStartEditComment(b);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-amber-50 text-slate-700 hover:text-amber-700 text-xs font-semibold transition"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    <span>Editar</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedMessageId(null);
+                                      handleDeleteComment(b);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-rose-50 text-rose-600 text-xs font-semibold transition"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Borrar</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </React.Fragment>
                     );
                   }
+                  const isClientSelected = selectedMessageId === b.id;
+                  const parsedClient = parseQuotedReplyPrefix(b.text || '');
                   return (
                     <React.Fragment key={b.id}>
                       {daySep}
-                      <div className="flex justify-start">
-                        <div className="max-w-lg bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs">
-                          <p className="text-[12.5px] font-semibold text-indigo-600 mb-0.5">{b.senderName}</p>
-                          {renderMedia(b)}
-                          {b.text && <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
-                          {b.transcript && (
-                            <p className="mt-1.5 text-[13px] text-slate-600 bg-slate-50 rounded-lg px-2.5 py-1.5 italic">
-                              <Mic className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />
-                              {b.transcript}
-                            </p>
-                          )}
-                          <div className="flex items-center justify-end mt-1">
-                            <span className="text-xs font-normal text-slate-400">{fmtTime(b.createdAt)}</span>
+                      <div className="flex flex-col items-start group/msg">
+                        <div className="flex justify-start items-start gap-1.5 w-full">
+                          <div
+                            onClick={() => setSelectedMessageId((prev) => (prev === b.id ? null : b.id))}
+                            className={`max-w-[85%] md:max-w-lg bg-white text-slate-900 rounded-2xl rounded-bl-xs px-3.5 py-2.5 md:px-4 md:py-3 shadow-2xs transition cursor-pointer ${
+                              isClientSelected ? 'ring-2 ring-indigo-400 ring-offset-1' : ''
+                            }`}
+                          >
+                            <p className="text-[12.5px] font-semibold text-indigo-600 mb-0.5">{b.senderName}</p>
+                            {renderMedia(b)}
+                            {parsedClient.quote && (
+                              <div className="mb-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 border-l-2 border-indigo-500 text-slate-600">
+                                <p className="text-[11px] font-bold text-indigo-600 truncate">{parsedClient.quote.author}</p>
+                                <p className="text-[11.5px] text-slate-500 line-clamp-2">{parsedClient.quote.text}</p>
+                              </div>
+                            )}
+                            {parsedClient.body && (
+                              <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">
+                                {parsedClient.body}
+                              </p>
+                            )}
+                            {b.transcript && (
+                              <p className="mt-1.5 text-[13px] text-slate-600 bg-slate-50 rounded-lg px-2.5 py-1.5 italic">
+                                <Mic className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />
+                                {b.transcript}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-end mt-1">
+                              <span className="text-xs font-normal text-slate-400">{fmtTime(b.createdAt)}</span>
+                            </div>
                           </div>
+                          {canSend && (parsedClient.body || b.transcript) && (
+                            <div className="hidden md:flex opacity-0 group-hover/msg:opacity-100 transition-opacity items-center bg-white border border-slate-200/90 rounded-xl px-1.5 py-1 shadow-2xs self-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const replySnippet = parsedClient.body || b.transcript || '';
+                                  setReplyingToMessage({ id: b.id, senderName: b.senderName, text: replySnippet });
+                                  composerRef.current?.setDraft('', 'whatsapp');
+                                }}
+                                title="Responder citando este mensaje"
+                                className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                              >
+                                <CornerUpLeft className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </div>
+                        {isClientSelected && canSend && (parsedClient.body || b.transcript) && (
+                          <div className="mt-1.5 inline-flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2 py-1 shadow-md z-20">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedMessageId(null);
+                                const replySnippet = parsedClient.body || b.transcript || '';
+                                setReplyingToMessage({ id: b.id, senderName: b.senderName, text: replySnippet });
+                                composerRef.current?.setDraft('', 'whatsapp');
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-semibold transition"
+                            >
+                              <CornerUpLeft className="w-3.5 h-3.5" />
+                              <span>Responder</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </React.Fragment>
                   );
@@ -5327,48 +5539,6 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {/* Responsive Tablet / Touch Commercial Action Bar (shown on < 768px where top header stays minimal) */}
-            {!activeCircle.isGroup &&
-              activeCircle.isWhatsApp &&
-              (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') &&
-              (scopes.all || scopes.leads) && (
-                <div className="md:hidden bg-white border-t border-slate-200/80 px-3 pt-2 pb-1 flex items-center gap-1.5 overflow-x-auto shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setShowDiscoveryHUD(true)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 active:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 whitespace-nowrap"
-                  >
-                    <Target className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>Diagnóstico</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSendDiscoveryFormLink(false)}
-                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-50 active:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 whitespace-nowrap"
-                  >
-                    <Send className="w-3 h-3 text-slate-500 shrink-0" />
-                    <span>Link Form</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenCalendarModal('followup')}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 active:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 whitespace-nowrap"
-                  >
-                    <Calendar className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                    <span>Agendar</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={creatingQuote || classifying}
-                    onClick={handleOpenQuoteBuilder}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 active:bg-indigo-700 text-white text-xs font-bold whitespace-nowrap disabled:opacity-50"
-                  >
-                    {creatingQuote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5 shrink-0" />}
-                    <span>Cotizar</span>
-                  </button>
-                </div>
-              )}
 
             {/* Regla 6+ mensajes: aviso automático para frenar chats de 30-40 mensajes */}
             {activeCircle.scope === 'soporte' &&
@@ -5513,6 +5683,8 @@ export const SupportChatCircles: React.FC = () => {
               sendingMessage={sendingMessage}
               uploadingFile={uploadingFile}
               activeQuickReplies={activeQuickReplies}
+              replyingTo={replyingToMessage}
+              onCancelReply={() => setReplyingToMessage(null)}
               onSendWhatsApp={handleSendReply}
               onSaveInternalNote={handleSaveInternalNote}
               onUploadAttachment={handleUploadAttachment}
@@ -6065,6 +6237,158 @@ export const SupportChatCircles: React.FC = () => {
             loadThread(false);
           }}
         />
+      )}
+      {/* Mobile-Only Bottom Sheet (Essential quick actions; advanced tools stay on Desktop/Tablet) */}
+      {activeCircle && showMobileActionsSheet && (
+        <div
+          className="md:hidden fixed inset-0 z-[200] flex flex-col justify-end"
+          onClick={() => setShowMobileActionsSheet(false)}
+        >
+          <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-[1px]" />
+          <div
+            className="relative bg-white rounded-t-3xl px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="min-w-0 pr-2">
+                <p className="text-sm font-bold text-slate-900 truncate">{activeCircle.clientName}</p>
+                <p className="text-xs text-slate-500 truncate">
+                  {activeCircle.isGroup ? 'Grupo de WhatsApp' : activeCircle.phone ? `+${activeCircle.phone}` : 'Chat WhatsApp'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMobileActionsSheet(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {!activeCircle.isGroup &&
+              (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') &&
+              (scopes.all || scopes.leads) && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <Tag className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Cambiar estado del Lead</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LEAD_STATUS_OPTIONS.map((st) => {
+                      const active = (activeCircle.leadStatus || 'Prospecto') === st;
+                      return (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => {
+                            setShowMobileActionsSheet(false);
+                            handleUpdateLeadStatus(st);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                            active
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-slate-50 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {st}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+            <div className="space-y-2">
+              {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && !isSupportTicket(activeCircle.activeTicket) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileActionsSheet(false);
+                    setShowCreateTicketModal(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50 border border-indigo-200/80 text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <TicketIcon className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-indigo-950">Crear Ticket Técnico (con IA)</p>
+                      <p className="text-[11px] text-indigo-700">Módulo — Problema concreto</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-indigo-500 shrink-0" />
+                </button>
+              )}
+
+              {activeCircle.unreadOrWaitingReply ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileActionsSheet(false);
+                    handleMarkCircleAttended(activeCircle);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-950">Marcar como Atendido</p>
+                      <p className="text-[11px] text-emerald-700">Limpia la alerta de espera</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-emerald-600 shrink-0" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMobileActionsSheet(false);
+                    handleMarkCircleUnread(activeCircle);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+                      <RotateCcw className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Devolver a No leído</p>
+                      <p className="text-[11px] text-slate-500">Para retomar después</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                </button>
+              )}
+
+              {!activeCircle.isGroup && activeCircle.phone && (
+                <a
+                  href={`tel:+${activeCircle.phone.replace(/\D/g, '')}`}
+                  onClick={() => setShowMobileActionsSheet(false)}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                      <Phone className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Llamar al contacto</p>
+                      <p className="text-[11px] text-slate-500">+{activeCircle.phone}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                </a>
+              )}
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-100 text-[11px] text-slate-600 leading-snug">
+              <strong>Cotizar, Diagnóstico, Agendar Meet, Ficha completa e IA</strong> están optimizados para <strong>Laptop / Desktop / Tablet</strong>.
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { Users, Clock, Eye, Check, CheckCheck } from 'lucide-react';
+import { Users, Clock, Eye, Check, CheckCheck, Bot, Calendar, UserCheck } from 'lucide-react';
 import type { SupportCircle } from './types';
 import { initials, formatWaitDuration, listTimeLabel } from './helpers';
 
@@ -100,25 +100,28 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.scope === 'lead' && qualifierStatus === 'handed_off' && (
               <span
                 title="El lead pidió hablar con un asesor humano"
-                className="px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold leading-none shrink-0"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold leading-none shrink-0"
               >
-                🙋 Asesor
+                <UserCheck className="w-2.5 h-2.5" />
+                Asesor
               </span>
             )}
             {circle.scope === 'lead' && isQualifierActive && qualifierStatus !== 'handed_off' && (
               <span
                 title="Calificador Comercial IA activo en este chat"
-                className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold leading-none shrink-0"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold leading-none shrink-0"
               >
-                🤖 IA
+                <Bot className="w-2.5 h-2.5" />
+                IA
               </span>
             )}
             {circle.scope === 'lead' && qualifierStatus === 'demo_booked' && (
               <span
                 title="Demo agendada automáticamente por IA"
-                className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold leading-none shrink-0"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold leading-none shrink-0"
               >
-                📅 Demo
+                <Calendar className="w-2.5 h-2.5" />
+                Demo
               </span>
             )}
           </div>

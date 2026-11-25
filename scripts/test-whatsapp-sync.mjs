@@ -610,3 +610,38 @@ test('12. isCourtesyClosingMessage catches polite closings without swallowing re
     assert.equal(isCourtesyClosingMessage(msg), false, `Expected false for: ${msg}`);
   }
 });
+
+test('13. Quoted reply helpers format and parse WhatsApp reply prefixes cleanly', () => {
+  const { formatQuotedReplyText, parseQuotedReplyPrefix } = loaded.waHelpers;
+  const formatted = formatQuotedReplyText(
+    { id: 'm1', senderName: 'Salinera San Jorge', text: 'Error al emitir\nfactura sujeto excluido' },
+    'Ya lo estamos revisando en Ingeniería.',
+  );
+  assert.equal(
+    formatted,
+    '> Salinera San Jorge: Error al emitir factura sujeto excluido\n\nYa lo estamos revisando en Ingeniería.',
+  );
+
+  const parsed = parseQuotedReplyPrefix(formatted);
+  assert.deepEqual(parsed, {
+    quote: {
+      author: 'Salinera San Jorge',
+      text: 'Error al emitir factura sujeto excluido',
+    },
+    body: 'Ya lo estamos revisando en Ingeniería.',
+  });
+
+  const plain = parseQuotedReplyPrefix('Hola buenas tardes, ¿cómo le ayudo?');
+  assert.deepEqual(plain, {
+    quote: null,
+    body: 'Hola buenas tardes, ¿cómo le ayudo?',
+  });
+
+  const longQuote = formatQuotedReplyText(
+    { id: 'm2', senderName: 'Cliente', text: 'A'.repeat(160) },
+    'Recibido',
+  );
+  const parsedLong = parseQuotedReplyPrefix(longQuote);
+  assert.equal(parsedLong.quote?.text.length, 120);
+  assert.equal(parsedLong.quote?.text.endsWith('...'), true);
+});
