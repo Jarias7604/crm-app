@@ -52,7 +52,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
     <button
       type="button"
       onClick={() => onSelect(circle)}
-      className={`w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 transition relative border-l-[3px] ${
+      className={`w-full text-left px-4 py-3.5 md:px-3.5 md:py-2.5 flex items-center gap-3 md:gap-2.5 transition relative border-l-[3px] ${
         isSelected
           ? 'bg-indigo-50/80 border-l-indigo-600'
           : unread
@@ -62,7 +62,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
     >
       <div className="relative shrink-0">
         <div
-          className={`w-9.5 h-9.5 rounded-full flex items-center justify-center text-[13px] ${
+          className={`w-11 h-11 md:w-9.5 md:h-9.5 rounded-full flex items-center justify-center text-[14.5px] md:text-[13px] ${
             unread
               ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
               : isSelected
@@ -70,18 +70,18 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
               : 'bg-slate-100 text-slate-500 font-semibold'
           }`}
         >
-          {circle.isGroup ? <Users className="w-4 h-4" /> : initials(circle.clientName)}
+          {circle.isGroup ? <Users className="w-5 h-5 md:w-4 md:h-4" /> : initials(circle.clientName)}
         </div>
         {unread && <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white absolute -top-0.5 -right-0.5" />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className={`text-[14px] truncate ${unread ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>
+            <span className={`text-[15.5px] md:text-[14px] truncate ${unread ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>
               {circle.clientName}
             </span>
             <span
-              className={`text-[12px] shrink-0 ${
+              className={`text-[13px] md:text-[12px] shrink-0 ${
                 circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
                   ? 'text-slate-500 font-normal'
                   : 'text-slate-400 font-normal'
@@ -92,7 +92,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.isReactivation && (
               <span
                 title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                className="text-[11px] font-normal text-slate-400 shrink-0"
+                className="text-[11.5px] md:text-[11px] font-normal text-slate-400 shrink-0"
               >
                 {circle.reactivationReplied ? '· React.' : `· Toque ${circle.reactivationTouch || 1}`}
               </span>
@@ -100,7 +100,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.scope === 'lead' && qualifierStatus === 'handed_off' && (
               <span
                 title="El lead pidió hablar con un asesor humano"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold leading-none shrink-0"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10.5px] md:text-[10px] font-bold leading-none shrink-0"
               >
                 <UserCheck className="w-2.5 h-2.5" />
                 Asesor
@@ -109,7 +109,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.scope === 'lead' && isQualifierActive && qualifierStatus !== 'handed_off' && (
               <span
                 title="Calificador Comercial IA activo en este chat"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold leading-none shrink-0"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10.5px] md:text-[10px] font-bold leading-none shrink-0"
               >
                 <Bot className="w-2.5 h-2.5" />
                 IA
@@ -118,7 +118,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.scope === 'lead' && qualifierStatus === 'demo_booked' && (
               <span
                 title="Demo agendada automáticamente por IA"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold leading-none shrink-0"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10.5px] md:text-[10px] font-bold leading-none shrink-0"
               >
                 <Calendar className="w-2.5 h-2.5" />
                 Demo
@@ -135,19 +135,19 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
                 {formatWaitDuration(circle.waitMinutes)}
               </span>
             )}
-            <span className={`text-[12px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
+            <span className={`text-[12.5px] md:text-[12px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
               {listTimeLabel(circle.lastMessageAt)}
             </span>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className={`text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
+        <div className="flex items-center justify-between gap-2 mt-1 md:mt-0.5">
+          <p className={`text-[14px] md:text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
             {circle.lastMessageSender}: {circle.lastMessageText}
           </p>
           {circle.teamStatus === 'unopened' ? (
             <span
               title="Nadie del equipo ha abierto este mensaje"
-              className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-none shrink-0"
+              className="px-2 md:px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[11px] md:text-[10px] font-bold leading-none shrink-0"
             >
               Sin abrir
             </span>
@@ -158,7 +158,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
                   ? 'Visto en WhatsApp (celular/Web) · Sin responder aún'
                   : `Visto por ${circle.seenByOtherNames.join(', ')} · Sin responder aún`
               }
-              className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 text-[10px] font-semibold leading-none shrink-0 inline-flex items-center gap-0.5"
+              className="px-2 md:px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] md:text-[10px] font-semibold leading-none shrink-0 inline-flex items-center gap-0.5"
             >
               <Eye className="w-2.5 h-2.5" />
               {circle.seenByOtherNames[0]}
@@ -167,30 +167,30 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
           ) : circle.teamStatus === 'seen_waiting' ? (
             <span
               title="Ya abierto por ti · Pendiente de responder"
-              className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 text-[10px] font-semibold leading-none shrink-0"
+              className="px-2 md:px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 text-[11px] md:text-[10px] font-semibold leading-none shrink-0"
             >
               Sin contestar
             </span>
           ) : circle.teamStatus === 'replied' ? (
             <span
               title={`Última respuesta enviada por ${circle.repliedByShortName || 'Equipo'}`}
-              className="text-[10.5px] font-medium text-emerald-700 leading-none shrink-0 inline-flex items-center gap-0.5"
+              className="text-[11.5px] md:text-[10.5px] font-medium text-emerald-700 leading-none shrink-0 inline-flex items-center gap-0.5"
             >
-              <CheckCheck className="w-3 h-3 text-emerald-600" />
+              <CheckCheck className="w-3.5 h-3.5 md:w-3 md:h-3 text-emerald-600" />
               {circle.repliedByShortName || 'Equipo'}
             </span>
           ) : circle.teamStatus === 'attended' ? (
             <span
               title={`Marcado como atendido${circle.attendedByShortName ? ` por ${circle.attendedByShortName}` : ''}`}
-              className="text-[10.5px] font-medium text-slate-500 leading-none shrink-0 inline-flex items-center gap-0.5"
+              className="text-[11.5px] md:text-[10.5px] font-medium text-slate-500 leading-none shrink-0 inline-flex items-center gap-0.5"
             >
-              <Check className="w-3 h-3 text-slate-400" />
+              <Check className="w-3.5 h-3.5 md:w-3 md:h-3 text-slate-400" />
               {circle.attendedByShortName ? `Atendido · ${circle.attendedByShortName}` : 'Atendido'}
             </span>
           ) : unread ? (
             <span
               title="Recordatorio personal (marcado como no leído)"
-              className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[10px] font-semibold leading-none shrink-0"
+              className="px-2 md:px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[11px] md:text-[10px] font-semibold leading-none shrink-0"
             >
               Recordatorio
             </span>

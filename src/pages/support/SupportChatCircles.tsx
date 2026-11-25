@@ -3370,14 +3370,14 @@ export const SupportChatCircles: React.FC = () => {
     <div className="min-h-[100dvh] lg:min-h-0 lg:h-full flex-1 flex flex-col bg-[#F5F6FA] lg:overflow-hidden">
       {/* ── TOP HEADER (Sticky on mobile list scroll; hidden on mobile when inside an active chat) ── */}
       <header
-        className={`sticky top-0 lg:static h-12 bg-white border-b border-slate-200/80 px-3.5 md:px-5 items-center justify-between shrink-0 z-30 ${
+        className={`sticky top-0 lg:static h-14 md:h-12 bg-white border-b border-slate-200/80 px-4 md:px-5 items-center justify-between shrink-0 z-30 ${
           mobileChatOpen && activeCircle ? 'hidden lg:flex' : 'flex'
         }`}
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-4.5 rounded-full bg-indigo-600" />
-            <span className="text-[15px] font-bold text-slate-900 tracking-tight">Chat WhatsApp</span>
+            <div className="w-1 h-5 md:h-4.5 rounded-full bg-indigo-600" />
+            <span className="text-[17px] md:text-[15px] font-bold text-slate-900 tracking-tight">Chat WhatsApp</span>
           </div>
           <span className="text-slate-300 hidden sm:inline">|</span>
           <span className="text-[13px] text-slate-500 hidden sm:inline truncate">
@@ -3422,7 +3422,7 @@ export const SupportChatCircles: React.FC = () => {
               type="button"
               onClick={() => setShowAlertsPopover((v) => !v)}
               title="Centro de Alertas y Seguimiento"
-              className="relative inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-[13px] font-semibold transition"
+              className="relative inline-flex items-center gap-1.5 px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-[14px] md:text-[13px] font-semibold transition"
             >
               {alertCircles.total > 0 || bellRinging ? (
                 <BellRing className={`w-4 h-4 text-indigo-600 ${bellRinging ? 'animate-bounce' : ''}`} />
@@ -3446,18 +3446,20 @@ export const SupportChatCircles: React.FC = () => {
             {showAlertsPopover && (
               <>
                 <div
-                  className="fixed inset-0 bg-slate-900/15 backdrop-blur-[1px] z-40"
+                  className="fixed inset-0 bg-slate-900/35 md:bg-slate-900/15 backdrop-blur-[1px] z-[200] md:z-40"
                   onClick={() => setShowAlertsPopover(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 w-[480px] max-w-[92vw] bg-[#F4F6FA] border-2 border-indigo-200/90 ring-1 ring-slate-900/10 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.24)] z-50 overflow-hidden">
-                  <div className="px-4 py-3 bg-[#EEF0FF] border-b border-indigo-200/80 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-2xs">
+                <div className="fixed inset-x-3 top-16 max-h-[calc(100dvh-5.5rem)] flex flex-col z-[210] md:inset-auto md:absolute md:right-0 md:top-full md:mt-2 md:w-[480px] md:max-w-[92vw] md:max-h-[82vh] md:z-50 bg-[#F4F6FA] border-2 border-indigo-200/90 ring-1 ring-slate-900/10 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.24)] overflow-hidden">
+                  <div className="px-4 py-3 bg-[#EEF0FF] border-b border-indigo-200/80 flex items-center justify-between gap-2 shrink-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-2xs shrink-0">
                         <Bell className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-[13.5px] font-bold text-indigo-950 tracking-tight">Centro de Alertas WhatsApp</span>
+                      <span className="text-[14px] md:text-[13.5px] font-bold text-indigo-950 tracking-tight truncate">
+                        Centro de Alertas WhatsApp
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -3467,7 +3469,8 @@ export const SupportChatCircles: React.FC = () => {
                         }}
                         className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-700 shadow-2xs transition"
                       >
-                        Probar sonido
+                        <span className="sm:hidden">Sonido</span>
+                        <span className="hidden sm:inline">Probar sonido</span>
                       </button>
                       <button
                         type="button"
@@ -3479,7 +3482,7 @@ export const SupportChatCircles: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center justify-between gap-2 text-xs">
+                  <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap text-xs shrink-0">
                     <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
                       <input
                         type="checkbox"
@@ -3505,7 +3508,7 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
 
                   {scopes.all && (
-                    <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center gap-1">
+                    <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center gap-1 flex-wrap shrink-0">
                       <span className="text-xs font-medium text-slate-400 mr-1.5">Área:</span>
                       {(
                         [
@@ -3530,7 +3533,7 @@ export const SupportChatCircles: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="max-h-[420px] overflow-y-auto p-3 space-y-3 bg-[#F4F6FA]">
+                  <div className="flex-1 min-h-0 md:max-h-[420px] overflow-y-auto p-3 space-y-3 bg-[#F4F6FA]">
                     {alertCircles.total === 0 ? (
                       <div className="p-8 bg-white rounded-xl border border-slate-200/80 text-center space-y-1">
                         <CheckCircle2 className="w-6 h-6 text-slate-400 mx-auto" />
@@ -3560,6 +3563,7 @@ export const SupportChatCircles: React.FC = () => {
                                     setStateFilters([]);
                                     setSelectedBuckets(['por_clasificar']);
                                     setSelectedCircleId(c.circleId);
+                                    setMobileChatOpen(true);
                                     setShowAlertsPopover(false);
                                   }}
                                   className="w-full text-left px-3.5 py-2.5 bg-white hover:bg-indigo-50/40 rounded-xl border border-slate-200/90 hover:border-indigo-300 shadow-2xs flex items-center gap-3 transition"
@@ -3611,6 +3615,7 @@ export const SupportChatCircles: React.FC = () => {
                                         setStateFilters([]);
                                         setSelectedBuckets([]);
                                         setSelectedCircleId(c.circleId);
+                                        setMobileChatOpen(true);
                                         setShowAlertsPopover(false);
                                       }}
                                       className="flex-1 min-w-0 text-left flex items-center gap-3"
@@ -3669,6 +3674,7 @@ export const SupportChatCircles: React.FC = () => {
                                       setStateFilters([]);
                                       setSelectedBuckets([]);
                                       setSelectedCircleId(c.circleId);
+                                      setMobileChatOpen(true);
                                       setShowAlertsPopover(false);
                                     }}
                                     className="w-full text-left px-3.5 py-2.5 bg-white hover:bg-indigo-50/40 rounded-xl border border-slate-200/90 hover:border-indigo-300 shadow-2xs flex items-center gap-3 transition"
@@ -3769,7 +3775,7 @@ export const SupportChatCircles: React.FC = () => {
               </button>
             </>
           )}
-          <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-[13px] flex items-center justify-center">
+          <div className="w-9 h-9 md:w-8 md:h-8 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-[14px] md:text-[13px] flex items-center justify-center">
             {initials(profile?.full_name || 'AD')}
           </div>
         </div>
@@ -3783,16 +3789,16 @@ export const SupportChatCircles: React.FC = () => {
             mobileChatOpen && activeCircle ? 'hidden' : 'flex'
           } ${leftListCollapsed ? 'lg:hidden' : 'lg:flex'}`}
         >
-          <div className="px-3.5 pt-2.5 pb-1.5 border-b border-slate-100 space-y-1.5 relative">
-            <div className="flex items-center gap-1.5">
+          <div className="px-4 pt-3 pb-2.5 md:px-3.5 md:pt-2.5 md:pb-1.5 border-b border-slate-100 space-y-2.5 md:space-y-1.5 relative">
+            <div className="flex items-center gap-2 md:gap-1.5">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4.5 h-4.5 md:w-4 md:h-4 text-slate-400 absolute left-3.5 md:left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar cliente, grupo o teléfono..."
-                  className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full pl-10 md:pl-9 pr-8 py-2.5 md:py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-[15px] md:text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 {searchQuery && (
                   <button
@@ -3801,7 +3807,7 @@ export const SupportChatCircles: React.FC = () => {
                     title="Limpiar búsqueda"
                     className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 absolute right-2 top-1/2 -translate-y-1/2 transition"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-4 h-4 md:w-3.5 md:h-3.5" />
                   </button>
                 )}
               </div>
@@ -3816,20 +3822,20 @@ export const SupportChatCircles: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowFilterMenu((v) => !v)}
-                    className={`px-2.5 py-1.5 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                    className={`px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl border text-[13.5px] md:text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
                       extraFilterCount > 0
                         ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                         : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
                     }`}
                   >
-                    <Filter className="w-3.5 h-3.5 text-slate-500" />
+                    <Filter className="w-4 h-4 md:w-3.5 md:h-3.5 text-slate-500" />
                     <span>Filtros</span>
                     {extraFilterCount > 0 && (
                       <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-tight">
                         {extraFilterCount}
                       </span>
                     )}
-                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                    <ChevronDown className="w-3.5 h-3.5 md:w-3 md:h-3 text-slate-400" />
                   </button>
                 );
               })()}
@@ -3843,9 +3849,14 @@ export const SupportChatCircles: React.FC = () => {
               </button>
             </div>
 
-            {/* Clean Filter Dropdown Menu */}
+            {/* Clean Filter Dropdown Menu (Centered modal on mobile, anchored popover on desktop) */}
             {showFilterMenu && (
-              <div className="absolute right-4 top-11 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
+              <>
+                <div
+                  className="md:hidden fixed inset-0 bg-slate-900/35 backdrop-blur-[1px] z-[200]"
+                  onClick={() => setShowFilterMenu(false)}
+                />
+                <div className="fixed inset-x-3 top-28 max-h-[72dvh] overflow-y-auto z-[210] md:inset-auto md:absolute md:right-4 md:top-11 md:w-64 md:max-h-none md:z-30 bg-white border border-slate-200 rounded-2xl shadow-xl p-2.5 md:p-1.5 space-y-1 text-[13.5px] md:text-xs">
                 <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                   <span>Refinar conversaciones</span>
                   <button type="button" onClick={() => setShowFilterMenu(false)} className="text-slate-400 hover:text-slate-600">
@@ -3963,10 +3974,11 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
                 )}
               </div>
+              </>
             )}
 
             {/* Row 1: Bandejas (1 sola fila deslizable en móvil; multi-selección en desktop) */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 md:pb-0 md:flex-wrap">
+            <div className="flex items-center gap-1.5 md:gap-1 overflow-x-auto pb-0.5 md:pb-0 md:flex-wrap">
               <button
                 type="button"
                 onClick={() => {
@@ -3974,7 +3986,7 @@ export const SupportChatCircles: React.FC = () => {
                   setSelectedBuckets([]);
                   setLeadSubFilter('activos');
                 }}
-                className={`px-2.5 md:px-2 py-1 rounded-full md:rounded-lg text-[12px] whitespace-nowrap transition shrink-0 ${
+                className={`px-3.5 md:px-2 py-1.5 md:py-1 rounded-full md:rounded-lg text-[13px] md:text-[12px] whitespace-nowrap transition shrink-0 ${
                   specialTray === null && selectedBuckets.length === 0 && !stateFilters.includes('waiting')
                     ? 'bg-slate-900 md:bg-indigo-50 text-white md:text-indigo-700 font-bold'
                     : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -3988,7 +4000,7 @@ export const SupportChatCircles: React.FC = () => {
                   if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
                   setStateFilters((prev) => toggleStateFilterSelection(prev, 'waiting'));
                 }}
-                className={`md:hidden px-2.5 py-1 rounded-full text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
+                className={`md:hidden px-3.5 py-1.5 rounded-full text-[13px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
                   stateFilters.includes('waiting')
                     ? 'bg-indigo-600 text-white font-bold'
                     : 'bg-slate-100 text-slate-700 font-medium'
@@ -4007,7 +4019,7 @@ export const SupportChatCircles: React.FC = () => {
                       setLeadSubFilter('activos');
                       setSelectedBuckets((prev) => toggleBucketSelection(prev, tab.id));
                     }}
-                    className={`px-2.5 md:px-2 py-1 rounded-full md:rounded-lg text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
+                    className={`px-3.5 md:px-2 py-1.5 md:py-1 rounded-full md:rounded-lg text-[13px] md:text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -4256,8 +4268,8 @@ export const SupportChatCircles: React.FC = () => {
               mobileChatOpen ? 'flex' : 'hidden lg:flex'
             }`}
           >
-            {/* Chat header (Sticky 54px Mobile Native Header & 1-Bar Desktop Header) */}
-            <div className="sticky top-0 lg:static z-30 h-[54px] md:h-auto bg-white border-b border-slate-200/70 px-2.5 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
+            {/* Chat header (Sticky 60px Mobile Native Header & 1-Bar Desktop Header) */}
+            <div className="sticky top-0 lg:static z-30 h-[60px] md:h-auto bg-white border-b border-slate-200/70 px-3 sm:px-4 py-2 md:py-1.5 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                 {/* Tablet / Mobile Back to List Button */}
                 <button
@@ -4267,12 +4279,12 @@ export const SupportChatCircles: React.FC = () => {
                     window.scrollTo({ top: 0, behavior: 'auto' });
                   }}
                   title="Volver a la lista de conversaciones"
-                  className="lg:hidden inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold shrink-0 transition"
+                  className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[13px] font-bold shrink-0 transition"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Chats</span>
                   {counts.waiting > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold">
+                    <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[11px] font-bold">
                       {counts.waiting}
                     </span>
                   )}
@@ -4288,13 +4300,13 @@ export const SupportChatCircles: React.FC = () => {
                   {leftListCollapsed ? <PanelRightClose className="w-4 h-4 text-indigo-600" /> : <PanelRightOpen className="w-4 h-4" />}
                 </button>
 
-                <div className={`w-9 h-9 rounded-full font-bold text-[13px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
-                  {activeCircle.isGroup ? <Users className="w-4 h-4" /> : initials(activeCircle.clientName)}
+                <div className={`w-10 h-10 md:w-9 md:h-9 rounded-full font-bold text-[14px] md:text-[13px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
+                  {activeCircle.isGroup ? <Users className="w-4.5 h-4.5 md:w-4 md:h-4" /> : initials(activeCircle.clientName)}
                 </div>
                 <div className="min-w-0 flex-1">
                   {/* Line 1: Name + essential status badges only (no duplicate Lead/Por tomar pill clutter) */}
                   <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
-                    <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[180px] sm:max-w-[240px] 2xl:max-w-[300px]">
+                    <h3 className="text-[16px] md:text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[180px] sm:max-w-[240px] 2xl:max-w-[300px]">
                       {activeCircle.clientName}
                     </h3>
                     {activeCircle.scope !== 'lead' && (
@@ -4373,7 +4385,7 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
 
                   {/* Line 2: Phone, PushName, Owner & Groups inline on a single truncated row */}
-                  <div className="flex items-center gap-1.5 text-[12px] font-medium text-slate-400 whitespace-nowrap overflow-hidden mt-0.5">
+                  <div className="flex items-center gap-1.5 text-[13px] md:text-[12px] font-medium text-slate-400 whitespace-nowrap overflow-hidden mt-0.5">
                     <span className="truncate">
                       {activeCircle.isGroup
                         ? 'Grupo de WhatsApp'
@@ -4420,9 +4432,9 @@ export const SupportChatCircles: React.FC = () => {
                   type="button"
                   onClick={() => setShowMobileActionsSheet(true)}
                   title="Acciones rápidas en móvil"
-                  className="md:hidden w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center transition"
+                  className="md:hidden w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 flex items-center justify-center transition"
                 >
-                  <MoreVertical className="w-4 h-4" />
+                  <MoreVertical className="w-4.5 h-4.5" />
                 </button>
 
                 {/* Support area selector + ticket status + quick tech assignment (Desktop/Tablet) */}
@@ -5263,7 +5275,7 @@ export const SupportChatCircles: React.FC = () => {
                                 isSelected ? 'ring-2 ring-indigo-400 ring-offset-1' : ''
                               }`}
                             >
-                              <p className="text-[12.5px] font-semibold text-indigo-700/85 mb-0.5">{b.senderName}</p>
+                              <p className="text-[13px] md:text-[12.5px] font-semibold text-indigo-700/85 mb-0.5">{b.senderName}</p>
                               {renderMedia(b)}
                               {isEditing ? (
                                 <div className="mt-1.5 space-y-2 min-w-0 w-full sm:min-w-[340px]" onClick={(e) => e.stopPropagation()}>
@@ -5309,7 +5321,7 @@ export const SupportChatCircles: React.FC = () => {
                                     </div>
                                   )}
                                   {parsedStaff.body && (
-                                    <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">
+                                    <p className="text-[15.5px] md:text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">
                                       {parsedStaff.body}
                                     </p>
                                   )}
@@ -5393,7 +5405,7 @@ export const SupportChatCircles: React.FC = () => {
                               isClientSelected ? 'ring-2 ring-indigo-400 ring-offset-1' : ''
                             }`}
                           >
-                            <p className="text-[12.5px] font-semibold text-indigo-600 mb-0.5">{b.senderName}</p>
+                            <p className="text-[13px] md:text-[12.5px] font-semibold text-indigo-600 mb-0.5">{b.senderName}</p>
                             {renderMedia(b)}
                             {parsedClient.quote && (
                               <div className="mb-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 border-l-2 border-indigo-500 text-slate-600">
@@ -5402,7 +5414,7 @@ export const SupportChatCircles: React.FC = () => {
                               </div>
                             )}
                             {parsedClient.body && (
-                              <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">
+                              <p className="text-[15.5px] md:text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">
                                 {parsedClient.body}
                               </p>
                             )}

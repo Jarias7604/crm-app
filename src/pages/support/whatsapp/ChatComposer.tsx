@@ -133,7 +133,7 @@ export const ChatComposer = memo(
             </div>
           )}
 
-          <div className="px-2.5 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:px-5 md:py-3 flex items-end gap-2 relative">
+          <div className="px-3 py-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] md:px-5 md:py-3 flex items-end gap-2 relative">
             <input
               ref={fileInputRef}
               type="file"
@@ -151,13 +151,13 @@ export const ChatComposer = memo(
               }}
               disabled={uploadingFile}
               title="Adjuntar, plantilla o nota"
-              className={`md:hidden w-10 h-10 rounded-full border flex items-center justify-center transition shrink-0 disabled:opacity-50 ${
+              className={`md:hidden w-11 h-11 rounded-full border flex items-center justify-center transition shrink-0 disabled:opacity-50 ${
                 showMobileAttachMenu
                   ? 'bg-indigo-600 text-white border-indigo-600'
                   : 'bg-slate-100 text-slate-600 border-slate-200/80'
               }`}
             >
-              {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
             </button>
 
             {showMobileAttachMenu && (
@@ -336,7 +336,7 @@ export const ChatComposer = memo(
                   ? 'Nota interna para el equipo (no se envía a WhatsApp)…'
                   : 'Escribe un mensaje…'
               }
-              className={`flex-1 resize-none max-h-28 md:max-h-32 px-3.5 md:px-4 py-2 md:py-2.5 rounded-2xl md:rounded-xl text-[16px] md:text-[14.5px] font-medium focus:outline-none focus:ring-2 transition ${
+              className={`flex-1 resize-none max-h-28 md:max-h-32 px-4 py-2.5 rounded-2xl md:rounded-xl text-[16px] md:text-[14.5px] font-medium focus:outline-none focus:ring-2 transition ${
                 composerMode === 'internal'
                   ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
                   : 'bg-slate-100 md:bg-slate-50 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/20'
@@ -346,11 +346,11 @@ export const ChatComposer = memo(
               type="button"
               disabled={!messageInput.trim() || sendingMessage}
               onClick={handleSubmit}
-              className={`inline-flex items-center justify-center gap-1.5 w-10 h-10 md:w-auto md:h-auto md:px-4 md:py-2.5 rounded-full md:rounded-xl disabled:opacity-40 text-white text-[13px] font-bold transition shrink-0 ${
+              className={`inline-flex items-center justify-center gap-1.5 w-11 h-11 md:w-auto md:h-auto md:px-4 md:py-2.5 rounded-full md:rounded-xl disabled:opacity-40 text-white text-[13px] font-bold transition shrink-0 ${
                 composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
               }`}
             >
-              {composerMode === 'internal' ? <StickyNote className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              {composerMode === 'internal' ? <StickyNote className="w-5 h-5 md:w-4 md:h-4" /> : <Send className="w-5 h-5 md:w-4 md:h-4" />}
               {composerMode === 'internal' && <span className="hidden sm:inline">Guardar nota</span>}
             </button>
           </div>

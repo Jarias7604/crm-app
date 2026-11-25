@@ -183,11 +183,11 @@ export const CreateTicketFromChatModal: React.FC<CreateTicketFromChatModalProps>
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-hidden flex flex-col border border-slate-200"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90dvh] overflow-hidden flex flex-col border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
