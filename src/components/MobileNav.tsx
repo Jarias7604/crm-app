@@ -137,7 +137,10 @@ export default function MobileNav() {
                 className="md:hidden fixed bottom-0 left-0 right-0 z-[100] px-3 pointer-events-none"
                 style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
             >
-                <nav className="pointer-events-auto mx-auto max-w-md h-[64px] px-2 rounded-full bg-white/65 supports-[backdrop-filter]:bg-white/52 backdrop-blur-2xl backdrop-saturate-180 border border-white/85 ring-1 ring-slate-900/[0.07] shadow-[0_12px_34px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)] flex items-center justify-around">
+                <nav
+                    style={{ WebkitBackdropFilter: 'blur(10px) saturate(180%)', backdropFilter: 'blur(10px) saturate(180%)' }}
+                    className="pointer-events-auto mx-auto max-w-md h-[64px] px-2 rounded-full bg-white/30 border border-white/75 ring-1 ring-slate-900/[0.06] shadow-[0_10px_30px_rgba(15,23,42,0.13),inset_0_1.5px_1px_rgba(255,255,255,0.85),inset_0_-1px_2px_rgba(15,23,42,0.05)] flex items-center justify-around"
+                >
                     {tabs.map((tab, idx) => {
                         const isTabActive = tab.current;
                         const isActive = tab.isCreate ? showActionSheet : isTabActive;
@@ -147,7 +150,7 @@ export default function MobileNav() {
                             <div className={cn(
                                 "inline-flex flex-col items-center justify-center transition-all relative rounded-full",
                                 isActive
-                                    ? "bg-blue-600/[0.11] text-blue-600 px-3.5 py-1.5"
+                                    ? "bg-blue-600/[0.12] text-blue-600 px-3.5 py-1.5"
                                     : "text-slate-950 px-2.5 py-1.5"
                             )}>
                                 <Icon

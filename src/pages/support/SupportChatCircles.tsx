@@ -3614,8 +3614,8 @@ export const SupportChatCircles: React.FC = () => {
           mobileChatOpen && activeCircle ? 'hidden lg:flex' : 'flex'
         } ${
           mobileListScrolled
-            ? 'h-[56px] bg-gradient-to-b from-white/85 via-white/45 to-transparent border-b border-transparent shadow-none pointer-events-none'
-            : 'h-[60px] bg-white/68 supports-[backdrop-filter]:bg-white/55 backdrop-blur-2xl backdrop-saturate-180 border-b border-white/75 shadow-[0_4px_20px_rgba(15,23,42,0.05)]'
+            ? 'h-[56px] bg-gradient-to-b from-white/55 via-white/20 to-transparent border-b border-transparent shadow-none pointer-events-none'
+            : 'h-[60px] bg-white/38 backdrop-blur-[10px] backdrop-saturate-[180%] border-b border-white/60 shadow-[0_4px_18px_rgba(15,23,42,0.04)]'
         }`}
       >
         <div
@@ -3672,8 +3672,8 @@ export const SupportChatCircles: React.FC = () => {
               title="Centro de Alertas y Seguimiento"
               className={`relative inline-flex items-center gap-1.5 px-3.5 py-2 md:px-3 md:py-1.5 text-[14.5px] md:text-[13px] font-semibold transition-all duration-200 lg:rounded-lg lg:bg-slate-50 lg:hover:bg-slate-100 lg:border lg:border-slate-200/80 lg:shadow-none lg:ring-0 lg:backdrop-blur-none ${
                 mobileListScrolled
-                  ? 'rounded-full bg-white/68 supports-[backdrop-filter]:bg-white/55 backdrop-blur-2xl backdrop-saturate-180 border border-white/85 ring-1 ring-slate-900/[0.08] shadow-[0_10px_28px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)] text-slate-900'
-                  : 'rounded-full bg-white/68 supports-[backdrop-filter]:bg-white/55 backdrop-blur-xl text-slate-800 border border-white/85 ring-1 ring-slate-900/[0.06] shadow-2xs hover:bg-white'
+                  ? 'rounded-full bg-white/32 backdrop-blur-[10px] backdrop-saturate-[180%] border border-white/75 ring-1 ring-slate-900/[0.08] shadow-[0_8px_24px_rgba(15,23,42,0.13),inset_0_1.5px_1px_rgba(255,255,255,0.85)] text-slate-900'
+                  : 'rounded-full bg-white/38 backdrop-blur-[10px] backdrop-saturate-[180%] text-slate-800 border border-white/75 ring-1 ring-slate-900/[0.06] shadow-2xs hover:bg-white/60'
               }`}
             >
               {alertCircles.total > 0 || bellRinging ? (
