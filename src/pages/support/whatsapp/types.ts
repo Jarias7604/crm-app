@@ -25,7 +25,7 @@ export type CircleBucket = 'soporte' | 'por_clasificar' | 'lead' | 'reactivados'
 
 export type SpecialTray = 'interno' | 'spam' | 'tickets';
 
-export type CircleStateFilter = 'unopened' | 'unread' | 'waiting' | 'replied';
+export type CircleStateFilter = 'unopened' | 'unread' | 'waiting' | 'replied' | 'failed';
 
 export type CircleTeamStatus = 'unopened' | 'seen_waiting' | 'replied' | 'attended' | 'idle';
 
@@ -74,6 +74,7 @@ export interface SupportCircle {
   reactivationTouch: number;
   hoursSinceReactivation: number;
   hasActiveConversation: boolean;
+  failedOutboxCount?: number;
 }
 
 export interface LeadQuoteSummary {
@@ -130,6 +131,7 @@ export interface ChatItem {
   legacyMedia?: { url: string; type: 'image' | 'video' | 'file' | 'audio'; name?: string };
   delivery?: OutboxRow['status'];
   deliveryError?: string | null;
+  outboxId?: string;
 }
 
 export interface WaGroupRow {

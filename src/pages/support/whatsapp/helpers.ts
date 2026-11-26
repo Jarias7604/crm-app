@@ -641,8 +641,11 @@ export function toggleStateFilterSelection(
   if (current.includes(flag)) {
     return current.filter((f) => f !== flag);
   }
+  if (flag === 'failed') {
+    return [...current.filter((f) => f !== 'replied'), 'failed'];
+  }
   if (flag === 'replied') {
-    return [...current.filter((f) => f !== 'unopened' && f !== 'waiting'), 'replied'];
+    return [...current.filter((f) => f !== 'unopened' && f !== 'waiting' && f !== 'failed'), 'replied'];
   }
   if (flag === 'unopened' || flag === 'waiting') {
     return [...current.filter((f) => f !== 'replied'), flag];
@@ -667,7 +670,7 @@ export function matchesCircleBucketAndTray(
 }
 
 export function matchesCircleStateFilters(
-  c: Pick<SupportCircle, 'teamStatus' | 'unreadOrWaitingReply'>,
+  c: Pick<SupportCircle, 'teamStatus' | 'unreadOrWaitingReply' | 'failedOutboxCount'>,
   stateFilters: CircleStateFilter[],
   unreadForMe: boolean,
 ): boolean {
@@ -676,8 +679,27 @@ export function matchesCircleStateFilters(
     if (f === 'unread' && !unreadForMe) return false;
     if (f === 'waiting' && !c.unreadOrWaitingReply) return false;
     if (f === 'replied' && c.teamStatus !== 'replied' && c.teamStatus !== 'attended') return false;
+    if (f === 'failed' && !(c.failedOutboxCount && c.failedOutboxCount > 0)) return false;
   }
   return true;
+}
+
+export function isRetryableOutboxError(errorText?: string | null): boolean {
+  const err = String(errorText || '');
+  if (!err) return true;
+  return !/exists"?\s*:\s*false/i.test(err);
+}
+
+export function computeQrRemainingSeconds(
+  generatedAtIso?: string | null,
+  ttlSeconds = 55,
+  nowMs = Date.now(),
+): number {
+  if (!generatedAtIso) return 0;
+  const parsed = Date.parse(generatedAtIso);
+  if (!Number.isFinite(parsed)) return 0;
+  const elapsedSec = Math.floor((nowMs - parsed) / 1000);
+  return Math.max(0, ttlSeconds - Math.max(0, elapsedSec));
 }
 
 const COURTESY_BLOCK_RE =

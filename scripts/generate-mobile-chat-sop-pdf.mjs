@@ -5,10 +5,10 @@ import { pathToFileURL } from 'node:url';
 
 const WORKSPACE = process.cwd();
 const SCRATCH_SHOTS =
-  'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch/screenshots';
+  'C:/Users/jaria/.gemini/antigravity/brain/f784bcb3-452c-43a0-a5e5-480cabc9324b/scratch/screenshots';
 const OUT_PDF = path.join(WORKSPACE, 'docs', 'SOP_Chat_WhatsApp_Movil_Nativo_Arias_CRM.pdf');
 const TMP_HTML = path.join(
-  'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch',
+  'C:/Users/jaria/.gemini/antigravity/brain/f784bcb3-452c-43a0-a5e5-480cabc9324b/scratch',
   'sop_mobile_chat.html',
 );
 
@@ -38,7 +38,8 @@ const sAccionesMsg = loadShot('mobile_chat_acciones_mensaje.png');
 const sMenu = loadShot('mobile_chat_menu_acciones.png');
 const sAlertas = loadShot('mobile_chat_alertas_centrado.png');
 const sFiltros = loadShot('mobile_chat_filtros.png');
-const sBridgeQr = loadShot('bridge_status_qr.jpg');
+const sBridgeQr = loadShot('bridge_modal_qr_pairing.png');
+const sNoEnviados = loadShot('chat_no_enviados_reenviar.png');
 
 const hdr = () => `
   <div class="top-rule">
@@ -48,11 +49,11 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.5 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.6 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const TOTAL_PAGES = 6;
+const TOTAL_PAGES = 7;
 
 const html = `<!DOCTYPE html>
 <html lang="es">
@@ -232,8 +233,8 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.5 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">25 de noviembre de 2026 (v1.5: Escudo Anti-Ban 20/h · 60/día y Reconexión / QR en vivo desde ⚙️)</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.6 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">25 de noviembre de 2026 (v1.6: Filtro No enviados, Reenviar sin pausar IA, QR con contador 55s y código 8 dígitos)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
         <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav, Sidebar, retiro/redirección de /marketing/chat → /support/chat y ChatComposer responsivo</td></tr>
       </table>
@@ -452,16 +453,17 @@ const html = `<!DOCTYPE html>
   <div>
     ${hdr()}
     <div class="kicker">05 / PROTECCIÓN ANTI-BAN Y RECONEXIÓN WHATSAPP</div>
-    <h1 class="sec-h1">Escudo Anti-Ban en reactivaciones y visor QR en vivo (⚙️)</h1>
-    <p class="lead-p">Para proteger el número de Soporte (<code>+503 7971-8911</code>) contra restricciones temporales de Meta/WhatsApp, el CRM aplica límites estrictos en servidor y permite diagnosticar o re-vincular la sesión directamente desde el engranaje <strong>⚙️</strong>.</p>
+    <h1 class="sec-h1">Escudo Anti-Ban, visor QR con vigencia (55s) y código 8 dígitos</h1>
+    <p class="lead-p">Para proteger el número <code>+503 7971-8911</code> y evitar escaneos sobre códigos QR expirados, el modal <strong>⚙️ Estado de la conexión WhatsApp</strong> muestra un contador en vivo, alerta si el puente VPS está sin señal y un código de 8 dígitos copiable.</p>
 
-    <div style="display:flex; flex-direction:column; align-items:center; margin: 4px 0 8px 0;">
-      <div class="phone-frame" style="width: 88%; margin-top: 6px; border-radius: 10px;">
-        <img src="${sBridgeQr}" alt="Modal Estado de conexión WhatsApp con QR en vivo" style="border-radius: 6px;" />
-        <div class="callout-box" style="left:95.2%;top:17.2%;width:2.2%;height:3.6%;"><span class="callout-tag right">1. Engranaje ⚙️</span></div>
-        <div class="callout-box" style="left:39.2%;top:19.0%;width:23.0%;height:70.5%;"><span class="callout-tag">2. Estado sesión + QR en vivo + Reconectar</span></div>
+    <div style="display:flex; flex-direction:column; align-items:center; margin: 2px 0 8px 0;">
+      <div class="phone-frame" style="width: 82%; margin-top: 6px; border-radius: 10px;">
+        <img src="${sBridgeQr}" alt="Modal Estado de conexión WhatsApp con contador QR y código de 8 dígitos" style="border-radius: 6px;" />
+        <div class="callout-box" style="left:96.0%;top:1.0%;width:2.8%;height:4.5%;"><span class="callout-tag bottom right">1. Engranaje ⚙️</span></div>
+        <div class="callout-box" style="left:35.8%;top:45.8%;width:28.0%;height:31.2%;"><span class="callout-tag right">2. QR vivo + Contador 55s</span></div>
+        <div class="callout-box" style="left:35.8%;top:78.2%;width:28.0%;height:16.5%;"><span class="callout-tag bottom">3. Código 8 dígitos + Copiar</span></div>
       </div>
-      <div class="fig-cap" style="margin-top: 8px;"><strong>Figura 7.</strong> Vista de producción (<code>ariascrm.com/support/chat</code>): desde el ícono ⚙️ se abre el diagnóstico de conexión, código QR escaneable y botón <em>Reconectar / Generar QR</em> sin banners invasivos en el área de trabajo.</div>
+      <div class="fig-cap" style="margin-top: 16px;"><strong>Figura 7.</strong> Visor en producción (<code>ariascrm.com/support/chat</code>): contador regresivo de vigencia (<code>Válido Xs</code>), ocultado automático al vencer (0s) y vinculación alterna por número de teléfono con código de 8 dígitos.</div>
     </div>
 
     <table class="inst" style="margin-bottom: 8px;">
@@ -469,17 +471,53 @@ const html = `<!DOCTYPE html>
         <tr><th style="width:32%;">Control / Regla</th><th style="width:68%;">Comportamiento automático en Producción</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Límites Anti-Ban en servidor</strong></td><td>Máximo <strong>20 reactivaciones por hora</strong>, <strong>60 por día (24h)</strong> y mínimo <strong>20s</strong> entre envíos (<code>HTTP 429</code>); bloquea lotes si la sesión no está <code>open</code> (<code>HTTP 503</code>).</td></tr>
-        <tr><td><strong>Modal Reactivación Segura</strong></td><td>Lotes permitidos solo de <strong>10, 20 (recomendado) o 30</strong> prospectos; pausa humana aleatoria de <strong>25–37s</strong> y aborto automático ante errores o límites.</td></tr>
-        <tr><td><strong>Watchdog &amp; Visor QR (⚙️)</strong></td><td>Auto-recupera caídas de red (<code>close</code>) cada 2 min; si WhatsApp exige re-vincular (<code>401</code>), pausa reinicios y muestra el QR vivo en <strong>Estado de la conexión WhatsApp</strong>.</td></tr>
+        <tr><td><strong>Límites Anti-Ban en servidor</strong></td><td>Máximo <strong>20 reactivaciones/hora</strong>, <strong>60/día (24h)</strong> y <strong>20s</strong> entre envíos (<code>HTTP 429</code>); bloquea lotes si la sesión no está <code>open</code> (<code>HTTP 503</code>).</td></tr>
+        <tr><td><strong>Visor QR 55s + Código 8 dígitos</strong></td><td>El QR se entrega sin retraso artificial y caduca visualmente a los <strong>55s</strong> (evita escanear capturas viejas). Incluye <strong>Código de vinculación</strong> para <em>Vincular con el número de teléfono</em>.</td></tr>
+        <tr><td><strong>Alerta Puente Evolution (⚙️)</strong></td><td>Si el puente lleva &gt;2 min <em>Sin señal</em>, avisa antes de generar QR para reiniciar el servicio en VPS antes de vincular.</td></tr>
       </tbody>
     </table>
 
-    <div class="alert-box" style="margin: 4px 0 0 0;">
-      <strong>Protocolo si aparece restricción temporal en el teléfono (+503 7971-8911):</strong> esperar a que venza el contador en el celular, eliminar sesiones viejas en <em>Dispositivos vinculados</em> (mantener cupo libre debajo de 4) y pulsar <strong>Reconectar / Generar QR</strong> desde ⚙️. Para envíos masivos mayores a 60/día usar un número aparte con <strong>API Oficial de Meta</strong>.
+    <div class="alert-box" style="margin: 2px 0 0 0;">
+      <strong>Regla de oro al vincular (+503 7971-8911):</strong> Nunca enviar captura del QR por WhatsApp (expira en ~45s). Quien tenga el celular debe abrir el CRM en su propia pantalla, verificar <em>Servidor Evolution: En línea</em>, pulsar <strong>Reconectar / Generar QR</strong> y escanear antes de 45s (o ingresar el código de 8 dígitos).
     </div>
   </div>
   ${ftr(6, TOTAL_PAGES)}
+</section>
+
+<!-- PAGE 7: RECUPERACIÓN DE ENVÍOS FALLIDOS Y TRAZABILIDAD IA -->
+<section class="page">
+  <div>
+    ${hdr()}
+    <div class="kicker">06 / RECUPERACIÓN DE ENVÍOS FALLIDOS Y TRAZABILIDAD IA</div>
+    <h1 class="sec-h1">Filtro “No enviados (N)” y reenvío 1-clic sin pausar la IA</h1>
+    <p class="lead-p">Cuando WhatsApp sufre una caída temporal (ej. código <code>401</code>), los mensajes del Calificador IA o del equipo quedan trazados con <code>▲ No enviado</code>. El sistema permite ubicarlos y reencolarlos en segundos sin duplicar burbujas ni apagar la IA.</p>
+
+    <div style="display:flex; flex-direction:column; align-items:center; margin: 2px 0 8px 0;">
+      <div class="phone-frame" style="width: 84%; margin-top: 6px; border-radius: 10px;">
+        <img src="${sNoEnviados}" alt="Filtro No enviados y botón Reenviar en burbuja del Calificador IA" style="border-radius: 6px;" />
+        <div class="callout-box" style="left:16.0%;top:21.1%;width:7.7%;height:3.1%;"><span class="callout-tag" style="top:1px;left:calc(100% + 4px);">1. Filtro No enviados (N)</span></div>
+        <div class="callout-box" style="left:16.0%;top:25.4%;width:24.7%;height:5.5%;"><span class="callout-tag" style="top:6px;left:calc(100% + 4px);">2. Reenviar todos (20s)</span></div>
+        <div class="callout-box" style="left:91.3%;top:44.3%;width:5.8%;height:2.8%;"><span class="callout-tag bottom right">3. Reenviar 1-clic (sin pausar IA)</span></div>
+      </div>
+      <div class="fig-cap" style="margin-top: 16px;"><strong>Figura 8.</strong> Bandeja filtrada por <code>No enviados (3)</code>: muestra el badge rojo por conversación, barra de reenvío masivo espaciado (20s) y botón directo <em>↻ Reenviar</em> en cada burbuja fallida.</div>
+    </div>
+
+    <table class="inst" style="margin-bottom: 8px;">
+      <thead>
+        <tr><th style="width:30%;">Mecanismo</th><th style="width:70%;">Regla operativa y trazabilidad garantizada</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Filtro global <code>No enviados (N)</code></strong></td><td>Detecta envíos recuperables con error de las últimas <strong>72h</strong> (excluye números sin WhatsApp <code>exists:false</code>) en desktop y móvil.</td></tr>
+        <tr><td><strong>Botón <code>↻ Reenviar</code> (burbuja)</strong></td><td>Reencola el <strong>mismo registro</strong> en <code>whatsapp_outbox</code> (<code>error → pending</code>): <strong>no duplica burbujas</strong>, <strong>no pausa el Calificador IA</strong> y actualiza a <code>✓✓</code> al entregarse.</td></tr>
+        <tr><td><strong>Reenvío en lote (pausa 20s)</strong></td><td>Al activar el filtro, permite reenviar todos con pausa automática de <strong>20s</strong> entre mensajes, botón <em>Detener</em> y bloqueo si la sesión está desconectada (<code>HTTP 503</code>).</td></tr>
+      </tbody>
+    </table>
+
+    <div class="info-box" style="margin: 2px 0 0 0;">
+      <strong>Protocolo tras reconectar WhatsApp:</strong> Abrir el filtro <strong>No enviados (N)</strong> en horario laboral (8:00 AM – 6:00 PM) y pulsar <strong>Reenviar todos (20s)</strong> o <strong>↻ Reenviar</strong> en cada lead nuevo para no perder ningún prospecto ni cortar el flujo autónomo del Calificador IA.
+    </div>
+  </div>
+  ${ftr(7, TOTAL_PAGES)}
 </section>
 
 </body>

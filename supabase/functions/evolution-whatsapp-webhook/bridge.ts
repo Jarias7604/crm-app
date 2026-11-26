@@ -277,8 +277,11 @@ export async function handleBridgeSh(
         `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); DCMD="docker"; if ! docker ps >/dev/null 2>&1 && sudo -n docker ps >/dev/null 2>&1; then DCMD="sudo -n docker"; fi; CID=$($DCMD ps --format '{{.ID}} {{.Ports}}' 2>/dev/null | grep '8085' | head -n 1 | awk '{print $1}'); FURL=$(echo "${fixUrlB64}" | base64 -d); RES="missing_cid"; if [ -n "$CID" ]; then IMG=$($DCMD inspect "$CID" --format '{{.Config.Image}}' 2>/dev/null); $DCMD cp "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" /tmp/baileys_cur.js 2>/dev/null; if grep -q "CB:status" /tmp/baileys_cur.js 2>/dev/null; then CMT=$($DCMD commit --pause=false "$CID" "$IMG" 2>&1); RES="already_patched_committed:$IMG:$CMT"; elif [ -n "$FURL" ]; then curl -fsSL "$FURL" -o /tmp/baileys_mr.js && grep -q "CB:status" /tmp/baileys_mr.js && grep -q "sourceMappingURL=messages-recv.js.map" /tmp/baileys_mr.js && cp /tmp/baileys_cur.js /tmp/baileys_mr.bak && $DCMD cp /tmp/baileys_mr.js "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" && CMT=$($DCMD commit --pause=false "$CID" "$IMG" 2>&1) && RST=$($DCMD restart "$CID" 2>&1) && sleep 16 && RES="patched_committed_restarted:$IMG:$CMT:$RST"; fi; fi; B3=$(printf '%s' "$RES" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
       );
     } else {
+      const evoCfg = await getBridgeState(supabase, 'evolution');
+      const pairingPhone = shellSafe(digits(evoCfg.phone || '50379718911'));
+      const connectQs = pairingPhone ? `?number=${pairingPhone}` : '';
       lines.push(
-        `(B0=$(curl -s "${evo}/instance/fetchInstances" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); R1=$(curl -s "${evo}/instance/connect/${inst}" -H "apikey: ${safeKey}"); B3=$(printf '%s' "$R1" | base64 | tr -d '\\n'); sleep 8; B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"evo_info":"%s","state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B0" "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+        `(B0=$(curl -s "${evo}/instance/fetchInstances" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); R1=$(curl -s "${evo}/instance/connect/${inst}${connectQs}" -H "apikey: ${safeKey}"); B3=$(printf '%s' "$R1" | base64 | tr -d '\\n'); if ! printf '%s' "$R1" | grep -qE '"(base64|pairingCode)"'; then sleep 6; fi; B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"evo_info":"%s","state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B0" "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
       );
     }
   }
@@ -527,11 +530,14 @@ export async function handleBridgeStatus(supabase: any): Promise<Response> {
     evoInfoList.find((i: any) => String(i?.name || i?.instance?.instanceName || '').toLowerCase() === String(instance).toLowerCase()) ||
     evoInfoList[0] ||
     (!Array.isArray(heal.evo_info) ? heal.evo_info : null);
-  const qrFresh = effectiveState !== 'open' && healTs > 0 && Date.now() - healTs < 3 * 60 * 1000;
+  const qrFresh = effectiveState !== 'open' && healTs > 0 && Date.now() - healTs < 60 * 1000;
+  const pairingFresh = effectiveState !== 'open' && healTs > 0 && Date.now() - healTs < 120 * 1000;
   const rawQrBase64 = qrFresh
     ? String(heal.restart?.base64 || heal.restart?.qrcode?.base64 || '').trim() || null
     : null;
-  const rawPairingCode = qrFresh && heal.restart?.pairingCode ? String(heal.restart.pairingCode) : null;
+  const rawPairingCode = pairingFresh
+    ? String(heal.restart?.pairingCode || heal.restart?.qrcode?.pairingCode || '').trim() || null
+    : null;
 
   return json({
     ok: true,
@@ -547,7 +553,10 @@ export async function handleBridgeStatus(supabase: any): Promise<Response> {
     evo_disconnection_reason:
       evoInfoItem?.disconnectionReasonCode ?? evoInfoItem?.instance?.disconnectionReasonCode ?? null,
     evo_qr_base64: rawQrBase64,
+    evo_qr_generated_at: rawQrBase64 ? heal.completed_at : null,
+    evo_qr_ttl_seconds: 55,
     evo_pairing_code: rawPairingCode,
+    evo_pairing_generated_at: rawPairingCode ? heal.completed_at : null,
     evo_watchdog_checked_at: wd.checked_at || null,
     evo_watchdog_recovered_total: wd.recovered_total || 0,
     catchup_status: mc.status || null,

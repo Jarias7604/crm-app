@@ -166,6 +166,7 @@ import {
   isCourtesyClosingMessage,
   formatQuotedReplyText,
   parseQuotedReplyPrefix,
+  isRetryableOutboxError,
   type QuotedReplyRef,
 } from './whatsapp/helpers';
 import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
@@ -216,6 +217,13 @@ export const SupportChatCircles: React.FC = () => {
   const [comments, setComments] = useState<TicketComment[]>([]);
   const [waMessages, setWaMessages] = useState<WaMessageRow[]>([]);
   const [outboxRows, setOutboxRows] = useState<OutboxRow[]>([]);
+  const [failedOutboxItems, setFailedOutboxItems] = useState<
+    Array<{ id: string; ticket_id: string | null; comment_id: string | null; error: string | null; created_at: string }>
+  >([]);
+  const [retryingOutboxId, setRetryingOutboxId] = useState<string | null>(null);
+  const [batchRetryingFailed, setBatchRetryingFailed] = useState(false);
+  const [batchRetryProgress, setBatchRetryProgress] = useState({ current: 0, total: 0, waitSec: 0 });
+  const batchRetryAbortRef = useRef(false);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [loadingComments, setLoadingComments] = useState(false);
 
@@ -828,7 +836,8 @@ export const SupportChatCircles: React.FC = () => {
 
   const loadReferenceData = useCallback(async () => {
     if (!activeCompanyId) return;
-    const [cats, ags, cls, lds, grps, existsFalseIds] = await Promise.all([
+    const failedCutoffIso = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+    const [cats, ags, cls, lds, grps, existsFalseIds, failedRows] = await Promise.all([
       ticketService.getCategories(activeCompanyId).catch(() => [] as TicketCategory[]),
       ticketService.getAgents(activeCompanyId).catch(() => [] as CompanyAgent[]),
       supabase
@@ -866,6 +875,21 @@ export const SupportChatCircles: React.FC = () => {
         }
         return ids;
       })().catch(() => new Set<string>()),
+      supabase
+        .from('whatsapp_outbox')
+        .select('id, ticket_id, comment_id, error, created_at')
+        .eq('company_id', activeCompanyId)
+        .eq('status', 'error')
+        .gte('created_at', failedCutoffIso)
+        .order('created_at', { ascending: true })
+        .limit(500)
+        .then(
+          (r) =>
+            ((r.data || []) as Array<{ id: string; ticket_id: string | null; comment_id: string | null; error: string | null; created_at: string }>).filter(
+              (row) => isRetryableOutboxError(row.error),
+            ),
+          () => [],
+        ),
     ]);
     setCategories(cats);
     setAgents(ags);
@@ -873,6 +897,7 @@ export const SupportChatCircles: React.FC = () => {
     setCompanyLeads(lds);
     setWaGroups(grps);
     setNonWaTicketIds(existsFalseIds);
+    setFailedOutboxItems(failedRows);
     refsLoadedForCompanyRef.current = activeCompanyId;
   }, [activeCompanyId]);
 
@@ -912,6 +937,17 @@ export const SupportChatCircles: React.FC = () => {
   }, [activeCompanyId, scopes.any]);
 
   // ── Circles (one per WhatsApp chat; legacy tickets grouped by client) ─────
+  const failedOutboxByTicket = useMemo(() => {
+    const map = new Map<string, typeof failedOutboxItems>();
+    for (const item of failedOutboxItems) {
+      if (!item.ticket_id) continue;
+      const arr = map.get(item.ticket_id);
+      if (arr) arr.push(item);
+      else map.set(item.ticket_id, [item]);
+    }
+    return map;
+  }, [failedOutboxItems]);
+
   const circles = useMemo<SupportCircle[]>(() => {
     const catMap = new Map<string, TicketCategory>();
     categories.forEach((c) => catMap.set(c.id, c));
@@ -1161,6 +1197,8 @@ export const SupportChatCircles: React.FC = () => {
         }
       }
 
+      const failedOutboxCount = sorted.reduce((acc, t) => acc + (failedOutboxByTicket.get(t.id)?.length || 0), 0);
+
       list.push({
         circleId: key,
         clientName,
@@ -1206,6 +1244,7 @@ export const SupportChatCircles: React.FC = () => {
         reactivationTouch,
         hoursSinceReactivation,
         hasActiveConversation,
+        failedOutboxCount,
       });
     });
 
@@ -1214,7 +1253,7 @@ export const SupportChatCircles: React.FC = () => {
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, categories, agents, realClients, companyLeads, nonWaTicketIds, scopes, profile?.id, profile?.full_name, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap, readCirclesMap]);
+  }, [tickets, categories, agents, realClients, companyLeads, nonWaTicketIds, failedOutboxByTicket, scopes, profile?.id, profile?.full_name, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap, readCirclesMap]);
 
   const parsedResolvedTriggerPhrases = useMemo(() => {
     const arr = resolvedTriggerPhrasesText
@@ -1385,6 +1424,7 @@ export const SupportChatCircles: React.FC = () => {
       unread: base.filter((c) => isUnread(c)).length,
       waiting: waitingList.length,
       replied: base.filter((c) => c.teamStatus === 'replied' || c.teamStatus === 'attended').length,
+      failed: base.filter((c) => (c.failedOutboxCount || 0) > 0).length,
       mine: base.filter((c) => isMine(c)).length,
       unassigned: base.filter((c) => isUnassigned(c)).length,
       urgent: waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length,
@@ -1673,6 +1713,23 @@ export const SupportChatCircles: React.FC = () => {
     setVisibleCircleLimit(80);
   }, [selectedBuckets, stateFilters, specialTray, ownerFilter, channelFilter, leadSubFilter, searchQuery]);
 
+  const batchFailedTargets = useMemo(() => {
+    if (!stateFilters.includes('failed')) return [];
+    const visibleTicketIds = new Set<string>();
+    for (const c of filteredCircles) {
+      for (const t of c.allClientTickets) visibleTicketIds.add(t.id);
+    }
+    const seen = new Set<string>();
+    const list: typeof failedOutboxItems = [];
+    for (const item of failedOutboxItems) {
+      if (!item.ticket_id || !visibleTicketIds.has(item.ticket_id)) continue;
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      list.push(item);
+    }
+    return list;
+  }, [stateFilters, filteredCircles, failedOutboxItems]);
+
   const visibleCircles = useMemo(() => {
     if (filteredCircles.length <= visibleCircleLimit) return filteredCircles;
     if (selectedCircleId) {
@@ -1823,7 +1880,8 @@ export const SupportChatCircles: React.FC = () => {
           supabase
             .from('whatsapp_outbox')
             .select('id, comment_id, status, error')
-            .in('ticket_id', threadTicketIds),
+            .in('ticket_id', threadTicketIds)
+            .order('created_at', { ascending: true }),
         ]);
         const msgs = (mRes.data || []) as WaMessageRow[];
         setComments((cRes.data || []) as TicketComment[]);
@@ -1966,7 +2024,30 @@ export const SupportChatCircles: React.FC = () => {
         scheduleThread(p.new?.ticket_id),
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_outbox', filter }, (p: any) => {
+        const obId = p.new?.id as string | undefined;
+        const obStatus = p.new?.status as string | undefined;
+        const obErr = (p.new?.error as string | null) ?? null;
         const tId = p.new?.ticket_id as string | undefined;
+        if (obId) {
+          if (obStatus === 'error' && isRetryableOutboxError(obErr)) {
+            setFailedOutboxItems((prev) => {
+              const row = {
+                id: obId,
+                ticket_id: tId || null,
+                comment_id: (p.new?.comment_id as string | null) ?? null,
+                error: obErr,
+                created_at: (p.new?.created_at as string) || new Date().toISOString(),
+              };
+              const idx = prev.findIndex((x) => x.id === obId);
+              if (idx === -1) return [...prev, row];
+              const next = prev.slice();
+              next[idx] = row;
+              return next;
+            });
+          } else if (obStatus && obStatus !== 'error') {
+            setFailedOutboxItems((prev) => prev.filter((x) => x.id !== obId));
+          }
+        }
         if (tId) {
           if (p.new?.status === 'sent' && p.new?.wa_message_id) {
             setNonWaTicketIds((prev) => {
@@ -2078,6 +2159,7 @@ export const SupportChatCircles: React.FC = () => {
         legacyMedia: audioUrlMatch ? { url: audioUrlMatch[1], type: 'audio' } : undefined,
         delivery: ob?.status,
         deliveryError: ob?.error,
+        outboxId: ob?.id,
       });
     });
 
@@ -2267,6 +2349,96 @@ export const SupportChatCircles: React.FC = () => {
       loadThread(false);
     } catch (err: any) {
       toast.error(err?.message || 'No se pudo reintentar');
+    }
+  };
+
+  const applyOutboxRequeued = useCallback((outboxId?: string | null, commentId?: string | null) => {
+    if (outboxId) {
+      setFailedOutboxItems((prev) => prev.filter((item) => item.id !== outboxId));
+    } else if (commentId) {
+      setFailedOutboxItems((prev) => prev.filter((item) => item.comment_id !== commentId));
+    }
+    setOutboxRows((prev) =>
+      prev.map((row) =>
+        (outboxId && row.id === outboxId) || (commentId && row.comment_id === commentId)
+          ? { ...row, status: 'pending', error: null }
+          : row,
+      ),
+    );
+  }, []);
+
+  const handleRetryOutbox = async (opts: { outboxId?: string; commentId?: string; ticketId?: string }) => {
+    const busyKey = opts.outboxId || opts.commentId || '';
+    if (!busyKey || retryingOutboxId) return;
+    setRetryingOutboxId(busyKey);
+    try {
+      const res = await invoke({
+        action: 'retry_outbox',
+        outbox_id: opts.outboxId || undefined,
+        comment_id: opts.commentId || undefined,
+        ticket_id: opts.ticketId || undefined,
+      });
+      applyOutboxRequeued(res?.outbox_id || opts.outboxId, res?.comment_id || opts.commentId);
+      toast.success(
+        res?.already_sent
+          ? 'Este mensaje ya había sido entregado'
+          : 'Mensaje reencolado sin pausar el Calificador IA',
+      );
+      loadThread(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo reenviar el mensaje');
+    } finally {
+      setRetryingOutboxId(null);
+    }
+  };
+
+  const handleBatchRetryFailed = async () => {
+    const targets = [...batchFailedTargets];
+    if (batchRetryingFailed || targets.length === 0) return;
+    if (waConnectionState && waConnectionState !== 'open') {
+      toast.error('WhatsApp (+503 7971-8911) está desconectado. Conecta la sesión antes de reenviar.');
+      return;
+    }
+    batchRetryAbortRef.current = false;
+    setBatchRetryingFailed(true);
+    setBatchRetryProgress({ current: 0, total: targets.length, waitSec: 0 });
+    let queuedCount = 0;
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        if (batchRetryAbortRef.current) break;
+        const item = targets[i];
+        setBatchRetryProgress({ current: i + 1, total: targets.length, waitSec: 0 });
+        const res = await invoke({
+          action: 'retry_outbox',
+          outbox_id: item.id,
+          comment_id: item.comment_id || undefined,
+          ticket_id: item.ticket_id || undefined,
+        });
+        applyOutboxRequeued(res?.outbox_id || item.id, res?.comment_id || item.comment_id);
+        queuedCount++;
+        if (i < targets.length - 1 && !batchRetryAbortRef.current) {
+          for (let sec = 20; sec > 0; sec--) {
+            if (batchRetryAbortRef.current) break;
+            setBatchRetryProgress({ current: i + 1, total: targets.length, waitSec: sec });
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        }
+      }
+      if (queuedCount > 0) {
+        toast.success(
+          batchRetryAbortRef.current
+            ? `Reenvío detenido (${queuedCount} reencolados sin pausar la IA)`
+            : `${queuedCount} mensaje(s) reencolados con pausa segura`,
+        );
+        loadThread(false);
+        loadSupportData(true);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || `Reenvío pausado tras ${queuedCount} mensaje(s)`);
+    } finally {
+      setBatchRetryingFailed(false);
+      setBatchRetryProgress({ current: 0, total: 0, waitSec: 0 });
+      batchRetryAbortRef.current = false;
     }
   };
 
@@ -3253,15 +3425,15 @@ export const SupportChatCircles: React.FC = () => {
     try {
       await invoke({ action: 'request_evo_heal', mode: 'restart_and_catchup' });
       toast.success('Reconexión solicitada al servidor WhatsApp…');
-      for (const delay of [5000, 9000]) {
+      for (const delay of [2000, 3500, 5000]) {
         await new Promise((r) => setTimeout(r, delay));
         const st = await refreshBridgeStatus();
         if (st?.evo_connection_state === 'open') {
           toast.success('WhatsApp (+503 7971-8911) reconectado');
           break;
         }
-        if (st?.evo_qr_base64) {
-          toast('Escanea el código QR en pantalla desde +503 7971-8911', { duration: 6000 });
+        if (st?.evo_qr_base64 || st?.evo_pairing_code) {
+          toast('Escanea el QR o usa el código de 8 dígitos en +503 7971-8911', { duration: 6000 });
           break;
         }
       }
@@ -4065,6 +4237,23 @@ export const SupportChatCircles: React.FC = () => {
               >
                 <span>Sin contestar ({contextCounts.waiting})</span>
               </button>
+              {(contextCounts.failed > 0 || stateFilters.includes('failed')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                    setStateFilters((prev) => toggleStateFilterSelection(prev, 'failed'));
+                  }}
+                  className={`md:hidden px-3.5 py-1.5 rounded-full text-[13px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
+                    stateFilters.includes('failed')
+                      ? 'bg-rose-600 text-white font-bold'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200 font-semibold'
+                  }`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>No enviados ({contextCounts.failed})</span>
+                </button>
+              )}
               {bucketTabs.map((tab) => {
                 const active = specialTray === null && selectedBuckets.includes(tab.id);
                 return (
@@ -4149,6 +4338,24 @@ export const SupportChatCircles: React.FC = () => {
                 >
                   <span>Respondidos ({contextCounts.replied})</span>
                   <X className="w-3 h-3" />
+                </button>
+              )}
+
+              {(contextCounts.failed > 0 || stateFilters.includes('failed')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                    setStateFilters((prev) => toggleStateFilterSelection(prev, 'failed'));
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-[11.5px] whitespace-nowrap transition inline-flex items-center gap-1 ${
+                    stateFilters.includes('failed')
+                      ? 'bg-rose-600 text-white font-semibold shadow-2xs'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 font-semibold'
+                  }`}
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>No enviados ({contextCounts.failed})</span>
                 </button>
               )}
 
@@ -4247,6 +4454,44 @@ export const SupportChatCircles: React.FC = () => {
                         </button>
                       );
                     })}
+                </div>
+              </div>
+            )}
+            {stateFilters.includes('failed') && batchFailedTargets.length > 0 && canSend && (
+              <div className="pt-1 border-t border-rose-100">
+                <div className="px-2.5 py-2 rounded-xl bg-rose-50/90 border border-rose-200 flex items-center justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-bold text-rose-900 truncate">
+                      {batchRetryingFailed
+                        ? batchRetryProgress.waitSec > 0
+                          ? `Enviado ${batchRetryProgress.current}/${batchRetryProgress.total} · pausa segura ${batchRetryProgress.waitSec}s`
+                          : `Reencolando ${batchRetryProgress.current}/${batchRetryProgress.total}…`
+                        : `${batchFailedTargets.length} mensaje(s) sin enviar`}
+                    </p>
+                    <p className="text-[11px] text-rose-700/90 truncate">
+                      Reenvía sin duplicar burbujas ni pausar el Calificador IA
+                    </p>
+                  </div>
+                  {batchRetryingFailed ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        batchRetryAbortRef.current = true;
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white border border-rose-300 text-rose-700 font-bold text-[11px] shrink-0 hover:bg-rose-100 transition"
+                    >
+                      Detener
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleBatchRetryFailed}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] shrink-0 transition"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Reenviar todos (20s)</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -5389,8 +5634,30 @@ export const SupportChatCircles: React.FC = () => {
                                 {b.delivery === 'sent' ? (
                                   <CheckCheck className="w-3.5 h-3.5 text-emerald-500" aria-label="Entregado a WhatsApp" />
                                 ) : b.delivery === 'error' ? (
-                                  <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-xs font-bold text-rose-600">
-                                    <AlertTriangle className="w-3 h-3" /> No enviado
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-xs font-bold text-rose-600">
+                                      <AlertTriangle className="w-3 h-3" />{' '}
+                                      {isRetryableOutboxError(b.deliveryError) ? 'No enviado' : 'Sin WhatsApp'}
+                                    </span>
+                                    {canSend && isRetryableOutboxError(b.deliveryError) && (
+                                      <button
+                                        type="button"
+                                        disabled={retryingOutboxId === (b.outboxId || b.id)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRetryOutbox({
+                                            outboxId: b.outboxId,
+                                            commentId: b.id,
+                                            ticketId: b.ticketId,
+                                          });
+                                        }}
+                                        title="Reenviar este mismo mensaje sin pausar la IA"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition disabled:opacity-60"
+                                      >
+                                        <RefreshCw className={`w-3 h-3 ${retryingOutboxId === (b.outboxId || b.id) ? 'animate-spin' : ''}`} />
+                                        <span>{retryingOutboxId === (b.outboxId || b.id) ? 'Reenviando…' : 'Reenviar'}</span>
+                                      </button>
+                                    )}
                                   </span>
                                 ) : b.delivery ? (
                                   <Check className="w-3.5 h-3.5 text-slate-400" aria-label="En cola de envío" />

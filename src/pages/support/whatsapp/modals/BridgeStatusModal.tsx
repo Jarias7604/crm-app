@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, RefreshCw, QrCode, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, RefreshCw, QrCode, AlertTriangle, CheckCircle2, Copy, Check, Clock, Smartphone } from 'lucide-react';
+import { computeQrRemainingSeconds } from '../helpers';
 
 export interface BridgeStatusModalProps {
   isOpen: boolean;
@@ -20,7 +21,8 @@ export const BridgeStatusModal: React.FC<BridgeStatusModalProps> = ({
   reconnecting = false,
   isAdmin = false,
 }) => {
-  if (!isOpen) return null;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const waState = String(bridgeStatus?.evo_connection_state || '').toLowerCase();
   const isOpenState = waState === 'open';
@@ -33,11 +35,34 @@ export const BridgeStatusModal: React.FC<BridgeStatusModalProps> = ({
       ? qrBase64
       : `data:image/png;base64,${qrBase64}`
     : null;
+  const qrGeneratedAt = bridgeStatus?.evo_qr_generated_at || bridgeStatus?.evo_heal_completed_at || null;
+  const qrTtlSec = Number(bridgeStatus?.evo_qr_ttl_seconds || 55);
+  const qrRemainingSec = qrSrc ? computeQrRemainingSeconds(qrGeneratedAt, qrTtlSec, nowMs) : 0;
+  const pairingCode = typeof bridgeStatus?.evo_pairing_code === 'string' && bridgeStatus.evo_pairing_code.trim()
+    ? bridgeStatus.evo_pairing_code.trim()
+    : null;
+
+  useEffect(() => {
+    if (!isOpen || isOpenState || !qrSrc) return;
+    setNowMs(Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [isOpen, isOpenState, qrSrc, qrGeneratedAt]);
+
+  if (!isOpen) return null;
+
+  const handleCopyPairingCode = () => {
+    if (!pairingCode) return;
+    navigator.clipboard?.writeText(pairingCode).then(() => {
+      setCopiedCode(true);
+      window.setTimeout(() => setCopiedCode(false), 2000);
+    }).catch(() => {});
+  };
 
   return (
     <div className="fixed inset-0 z-[220] bg-slate-900/50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-6 space-y-4 shadow-2xl"
+        className="bg-white rounded-3xl max-w-md w-full max-h-[92dvh] overflow-y-auto p-5 space-y-3 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -103,7 +128,7 @@ export const BridgeStatusModal: React.FC<BridgeStatusModalProps> = ({
               <>
                 <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl">
                   {rows.map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between gap-2 px-3.5 py-2 text-xs">
+                    <div key={k} className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs">
                       <span className="text-slate-500 font-medium">{k}</span>
                       <span className="font-bold text-slate-800 text-right">{v}</span>
                     </div>
@@ -113,33 +138,87 @@ export const BridgeStatusModal: React.FC<BridgeStatusModalProps> = ({
                   )}
                 </div>
 
-                {!isOpenState && !qrSrc && (
+                {!isOpenState && !pollOk && (
+                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-snug">
+                    <strong>Puente Evolution sin señal ({ago(bridgeStatus.bridge_last_poll)}):</strong> pulsa{' '}
+                    <strong>Actualizar estado</strong>; si sigue sin señal, reinicia el servicio del puente en el VPS antes de intentar vincular.
+                  </div>
+                )}
+
+                {!isOpenState && !qrSrc && !pairingCode && (
                   <div className="p-3.5 rounded-2xl bg-rose-50/80 border border-rose-200 text-xs text-rose-900 leading-snug">
                     La sesión de WhatsApp en el servidor está desconectada
                     {isUnauthorized401 ? ' (dispositivo desvinculado en el celular, cód. 401)' : ''}. Pulsa{' '}
-                    <strong>Reconectar / Generar QR</strong> abajo para restablecer la conexión o mostrar un código QR fresco.
+                    <strong>Reconectar / Generar QR</strong> abajo para obtener un QR fresco y código de 8 dígitos.
                   </div>
                 )}
 
                 {!isOpenState && qrSrc && (
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-2.5">
-                    <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                      <QrCode className="w-4 h-4 text-indigo-600" />
-                      <span>Escanea este código QR para vincular WhatsApp</span>
-                    </div>
-                    <img
-                      src={qrSrc}
-                      alt="Código QR WhatsApp"
-                      className="w-56 h-56 mx-auto rounded-xl border border-slate-200 bg-white p-2 object-contain"
-                    />
-                    {bridgeStatus.evo_pairing_code && (
-                      <p className="text-xs font-mono font-bold text-indigo-700">
-                        Código de vinculación: {bridgeStatus.evo_pairing_code}
-                      </p>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-2">
+                    {qrRemainingSec > 0 ? (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                            <QrCode className="w-4 h-4 text-indigo-600" />
+                            <span>Escanea directo en esta pantalla</span>
+                          </div>
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold tabular-nums ${
+                              qrRemainingSec > 20
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}
+                          >
+                            <Clock className="w-3 h-3" />
+                            Válido {qrRemainingSec}s
+                          </span>
+                        </div>
+                        <img
+                          src={qrSrc}
+                          alt="Código QR WhatsApp"
+                          className="w-44 h-44 mx-auto rounded-xl border border-slate-200 bg-white p-1.5 object-contain"
+                        />
+                        <p className="text-[11px] text-slate-600 leading-snug">
+                          En <strong>+503 7971-8911</strong> abre <strong>WhatsApp → Dispositivos vinculados → Vincular dispositivo</strong>.
+                          No envíes captura del QR por WhatsApp (vence en ~45s).
+                        </p>
+                      </>
+                    ) : (
+                      <div className="py-3 space-y-1.5">
+                        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800">
+                          <Clock className="w-4 h-4 text-amber-600" />
+                          <span>El código QR anterior expiró (0s)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-snug">
+                          Los QR de WhatsApp caducan en ~45–55 segundos. Pulsa <strong>Reconectar / Generar QR</strong> abajo para generar uno fresco.
+                        </p>
+                      </div>
                     )}
-                    <p className="text-[11px] text-slate-600 leading-snug">
-                      En el teléfono <strong>+503 7971-8911</strong> abre{' '}
-                      <strong>WhatsApp → Dispositivos vinculados → Vincular dispositivo</strong>.
+                  </div>
+                )}
+
+                {!isOpenState && pairingCode && (
+                  <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                        <Smartphone className="w-4 h-4 text-indigo-600" />
+                        Código de vinculación (8 dígitos)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyPairingCode}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-50 text-[11px] font-bold text-indigo-700 transition"
+                      >
+                        {copiedCode ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        {copiedCode ? 'Copiado' : 'Copiar código'}
+                      </button>
+                    </div>
+                    <div className="py-1.5 px-3 rounded-xl bg-white border border-indigo-100 text-center font-mono text-lg font-black tracking-[0.22em] text-indigo-700">
+                      {pairingCode}
+                    </div>
+                    <p className="text-[11px] text-indigo-900/80 leading-snug">
+                      Si el QR falla o el teléfono está lejos: toca <strong>Vincular con el número de teléfono</strong> en{' '}
+                      <strong>+503 7971-8911</strong> e ingresa este código.
                     </p>
                   </div>
                 )}

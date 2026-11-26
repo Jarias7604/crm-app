@@ -698,7 +698,7 @@ serve(async (req: Request) => {
       'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel',
       'draft_technical_ticket', 'set_technical_ticket', 'cleanup_auto_junk_tickets',
       'promote_to_lead', 'classify_contact', 'update_lead_status', 'send_reply', 'send_media', 'send_reactivation',
-      'retry_media', 'bridge_status', 'rescope_now', 'request_history_import', 'request_evo_heal',
+      'retry_media', 'retry_outbox', 'bridge_status', 'rescope_now', 'request_history_import', 'request_evo_heal',
       'get_wa_team_access', 'set_wa_user_access', 'set_qualifier_thread_state',
     ];
     if (uiActions.includes(action)) {
@@ -747,6 +747,8 @@ serve(async (req: Request) => {
           return await handleSendReactivation(supabase, caller, payload);
         case 'retry_media':
           return await handleRetryMedia(supabase, caller, payload);
+        case 'retry_outbox':
+          return await handleRetryOutbox(supabase, caller, payload);
         case 'bridge_status':
           return await handleBridgeStatus(supabase);
         case 'rescope_now': {
@@ -1905,6 +1907,71 @@ async function handleRetryMedia(supabase: any, caller: Caller, payload: any): Pr
   if (!row.raw_message) return json({ ok: false, error: 'Este archivo ya no se puede volver a descargar' }, 409);
   await supabase.from('whatsapp_messages').update({ media_status: 'pending', media_attempts: 0, media_error: null }).eq('id', id);
   return json({ ok: true });
+}
+
+async function handleRetryOutbox(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const outboxId = String(payload?.outbox_id || '').trim();
+  const commentId = String(payload?.comment_id || '').trim();
+  const ticketId = String(payload?.ticket_id || '').trim();
+  if (!outboxId && !commentId) return json({ ok: false, error: 'Falta outbox_id o comment_id' }, 400);
+
+  // Verify WhatsApp connection is open before re-queuing
+  const [wdState, healState] = await Promise.all([
+    getBridgeState(supabase, 'evo_watchdog'),
+    getBridgeState(supabase, 'evo_heal'),
+  ]);
+  const wdTs = wdState?.checked_at ? new Date(wdState.checked_at).getTime() : 0;
+  const healTs = healState?.completed_at ? new Date(healState.completed_at).getTime() : 0;
+  const effectiveConnState = healTs >= wdTs
+    ? (healState?.connection_after || wdState?.connection_state || null)
+    : (wdState?.connection_state || healState?.connection_after || null);
+  if (effectiveConnState && effectiveConnState !== 'open') {
+    return json(
+      {
+        ok: false,
+        disconnected: true,
+        error: 'WhatsApp (+503 7971-8911) está desconectado. Conecta la sesión antes de reenviar.',
+      },
+      503,
+    );
+  }
+
+  let obQuery = supabase
+    .from('whatsapp_outbox')
+    .select('id, company_id, ticket_id, comment_id, status, error')
+    .eq('company_id', caller.companyId);
+  if (outboxId) {
+    obQuery = obQuery.eq('id', outboxId);
+  } else {
+    obQuery = obQuery.eq('comment_id', commentId).order('created_at', { ascending: false }).limit(1);
+  }
+  const { data: ob, error: obErr } = await obQuery.maybeSingle();
+  if (obErr) return json({ ok: false, error: obErr.message }, 500);
+  if (!ob) return json({ ok: false, error: 'No se encontró el envío en cola para reintentar' }, 404);
+
+  const checkTicketId = ob.ticket_id || ticketId;
+  if (checkTicketId && !(await ticketVisibleTo(caller, checkTicketId))) {
+    return json({ ok: false, error: 'No tienes acceso a este chat' }, 403);
+  }
+
+  if (ob.status === 'sent') return json({ ok: true, already_sent: true, outbox_id: ob.id, comment_id: ob.comment_id, ticket_id: ob.ticket_id });
+  if (ob.status === 'pending' || ob.status === 'dispatched') {
+    return json({ ok: true, already_queued: true, outbox_id: ob.id, comment_id: ob.comment_id, ticket_id: ob.ticket_id });
+  }
+  if (ob.status !== 'error') return json({ ok: false, error: 'El mensaje no está en estado de error' }, 409);
+
+  if (/exists"?\s*:\s*false/i.test(String(ob.error || '')) && payload?.force !== true) {
+    return json({ ok: false, non_whatsapp: true, error: 'Este número no tiene cuenta de WhatsApp activa.' }, 422);
+  }
+
+  const { error: upErr } = await supabase
+    .from('whatsapp_outbox')
+    .update({ status: 'pending', error: null, dispatched_at: null, acked_at: null })
+    .eq('id', ob.id)
+    .eq('status', 'error');
+  if (upErr) return json({ ok: false, error: upErr.message }, 500);
+
+  return json({ ok: true, outbox_id: ob.id, comment_id: ob.comment_id, ticket_id: ob.ticket_id, status: 'pending' });
 }
 
 async function handleSyncGroup(supabase: any, url: URL, payload: any): Promise<Response> {

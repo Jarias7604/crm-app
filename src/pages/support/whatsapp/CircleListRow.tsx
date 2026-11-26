@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { Users, Clock, Eye, Check, CheckCheck, Bot, Calendar, UserCheck } from 'lucide-react';
+import { Users, Clock, Eye, Check, CheckCheck, Bot, Calendar, UserCheck, AlertTriangle } from 'lucide-react';
 import type { SupportCircle } from './types';
 import { initials, formatWaitDuration, listTimeLabel } from './helpers';
 
@@ -126,6 +126,15 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {(circle.failedOutboxCount || 0) > 0 && (
+              <span
+                title={`${circle.failedOutboxCount} mensaje(s) sin enviar — pulsa para reenviar`}
+                className="hidden md:inline-flex px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[10.5px] font-bold items-center gap-0.5"
+              >
+                <AlertTriangle className="w-2.5 h-2.5" />
+                No enviado
+              </span>
+            )}
             {isOverdue && (
               <span
                 title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
@@ -233,6 +242,12 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold leading-none">
               <Clock className="w-3 h-3" />
               {formatWaitDuration(circle.waitMinutes)}
+            </span>
+          )}
+          {(circle.failedOutboxCount || 0) > 0 && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[11.5px] font-bold leading-none">
+              <AlertTriangle className="w-3 h-3" />
+              No enviado
             </span>
           )}
         </div>

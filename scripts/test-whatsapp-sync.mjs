@@ -645,3 +645,37 @@ test('13. Quoted reply helpers format and parse WhatsApp reply prefixes cleanly'
   assert.equal(parsedLong.quote?.text.length, 120);
   assert.equal(parsedLong.quote?.text.endsWith('...'), true);
 });
+
+test('14. Failed outbox filter, retryable error guard, and QR TTL countdown behave accurately', () => {
+  const {
+    toggleStateFilterSelection,
+    matchesCircleStateFilters,
+    isRetryableOutboxError,
+    computeQrRemainingSeconds,
+  } = loaded.waHelpers;
+
+  // Failed filter toggles cleanly and matches only circles with failedOutboxCount > 0
+  let states = toggleStateFilterSelection([], 'failed');
+  assert.deepEqual(states, ['failed']);
+  states = toggleStateFilterSelection(states, 'replied');
+  assert.deepEqual(states, ['replied']);
+  states = toggleStateFilterSelection(states, 'failed');
+  assert.deepEqual(states, ['failed']);
+
+  const failedLead = { teamStatus: 'idle', unreadOrWaitingReply: false, failedOutboxCount: 2 };
+  const okLead = { teamStatus: 'idle', unreadOrWaitingReply: false, failedOutboxCount: 0 };
+  assert.equal(matchesCircleStateFilters(failedLead, ['failed'], false), true);
+  assert.equal(matchesCircleStateFilters(okLead, ['failed'], false), false);
+
+  // exists:false is non-retryable; 401/500/empty errors are retryable
+  assert.equal(isRetryableOutboxError('{"exists":false,"jid":"50370001111"}'), false);
+  assert.equal(isRetryableOutboxError('{"status":500,"message":"Connection Closed"}'), true);
+  assert.equal(isRetryableOutboxError(null), true);
+
+  // QR remaining seconds countdown
+  const baseMs = Date.parse('2026-11-25T22:00:00.000Z');
+  assert.equal(computeQrRemainingSeconds('2026-11-25T22:00:00.000Z', 55, baseMs), 55);
+  assert.equal(computeQrRemainingSeconds('2026-11-25T22:00:00.000Z', 55, baseMs + 20_000), 35);
+  assert.equal(computeQrRemainingSeconds('2026-11-25T22:00:00.000Z', 55, baseMs + 60_000), 0);
+  assert.equal(computeQrRemainingSeconds(null, 55, baseMs), 0);
+});
