@@ -591,6 +591,20 @@ export const SupportChatCircles: React.FC = () => {
   const getActiveChatSeconds = () => Math.max(0, Math.floor((Date.now() - chatSessionStartedAt) / 1000));
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [mobileListScrolled, setMobileListScrolled] = useState(false);
+  useEffect(() => {
+    if (mobileChatOpen) {
+      setMobileListScrolled(false);
+      return;
+    }
+    const onScroll = () => {
+      const y = window.scrollY || document.documentElement.scrollTop || 0;
+      setMobileListScrolled((prev) => (prev ? y > 55 : y > 105));
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [mobileChatOpen]);
   const [leftListCollapsed, setLeftListCollapsed] = useState(false);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [replyingToMessage, setReplyingToMessage] = useState<QuotedReplyRef | null>(null);
@@ -3596,14 +3610,22 @@ export const SupportChatCircles: React.FC = () => {
     <div className="min-h-[100dvh] lg:min-h-0 lg:h-full flex-1 flex flex-col bg-[#F5F6FA] lg:overflow-hidden">
       {/* ── TOP HEADER (Fixed on mobile list scroll; hidden on mobile when inside an active chat) ── */}
       <header
-        className={`fixed top-0 left-0 right-0 lg:static h-14 md:h-12 bg-white border-b border-slate-200/80 px-4 md:px-5 items-center justify-between shrink-0 z-30 ${
+        className={`fixed top-0 left-0 right-0 lg:static lg:h-12 lg:bg-white lg:bg-none lg:backdrop-blur-none lg:border-b lg:border-slate-200/80 lg:shadow-none lg:pointer-events-auto px-4 md:px-5 items-center justify-between shrink-0 z-30 transition-all duration-200 ${
           mobileChatOpen && activeCircle ? 'hidden lg:flex' : 'flex'
+        } ${
+          mobileListScrolled
+            ? 'h-[56px] bg-gradient-to-b from-white/85 via-white/45 to-transparent border-b border-transparent shadow-none pointer-events-none'
+            : 'h-[60px] bg-white/68 supports-[backdrop-filter]:bg-white/55 backdrop-blur-2xl backdrop-saturate-180 border-b border-white/75 shadow-[0_4px_20px_rgba(15,23,42,0.05)]'
         }`}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div
+          className={`flex items-center gap-2.5 min-w-0 transition-all duration-200 lg:opacity-100 lg:translate-y-0 lg:pointer-events-auto ${
+            mobileListScrolled ? 'opacity-0 -translate-y-2 pointer-events-none' : 'opacity-100 translate-y-0'
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <div className="w-1 h-5 md:h-4.5 rounded-full bg-indigo-600" />
-            <span className="text-[17px] md:text-[15px] font-bold text-slate-900 tracking-tight">Chat WhatsApp</span>
+            <div className="w-1 h-5.5 md:h-4.5 rounded-full bg-indigo-600" />
+            <span className="text-[19px] md:text-[15px] font-bold text-slate-900 tracking-tight">Chat WhatsApp</span>
           </div>
           <span className="text-slate-300 hidden sm:inline">|</span>
           <span className="text-[13px] text-slate-500 hidden sm:inline truncate">
@@ -3643,22 +3665,26 @@ export const SupportChatCircles: React.FC = () => {
           </button>
 
           {/* Interactive Alert Bell & Notification Center */}
-          <div className="relative">
+          <div className="relative pointer-events-auto">
             <button
               type="button"
               onClick={() => setShowAlertsPopover((v) => !v)}
               title="Centro de Alertas y Seguimiento"
-              className="relative inline-flex items-center gap-1.5 px-3 py-2 md:py-1.5 rounded-xl md:rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-[14px] md:text-[13px] font-semibold transition"
+              className={`relative inline-flex items-center gap-1.5 px-3.5 py-2 md:px-3 md:py-1.5 text-[14.5px] md:text-[13px] font-semibold transition-all duration-200 lg:rounded-lg lg:bg-slate-50 lg:hover:bg-slate-100 lg:border lg:border-slate-200/80 lg:shadow-none lg:ring-0 lg:backdrop-blur-none ${
+                mobileListScrolled
+                  ? 'rounded-full bg-white/68 supports-[backdrop-filter]:bg-white/55 backdrop-blur-2xl backdrop-saturate-180 border border-white/85 ring-1 ring-slate-900/[0.08] shadow-[0_10px_28px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)] text-slate-900'
+                  : 'rounded-full bg-white/68 supports-[backdrop-filter]:bg-white/55 backdrop-blur-xl text-slate-800 border border-white/85 ring-1 ring-slate-900/[0.06] shadow-2xs hover:bg-white'
+              }`}
             >
               {alertCircles.total > 0 || bellRinging ? (
-                <BellRing className={`w-4 h-4 text-indigo-600 ${bellRinging ? 'animate-bounce' : ''}`} />
+                <BellRing className={`w-5 h-5 md:w-4 md:h-4 text-indigo-600 ${bellRinging ? 'animate-bounce' : ''}`} />
               ) : (
-                <Bell className="w-4 h-4 text-slate-500" />
+                <Bell className="w-5 h-5 md:w-4 md:h-4 text-slate-500" />
               )}
               <span className="hidden sm:inline">Alertas</span>
               {alertCircles.total > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[11px] font-bold border ${
+                  className={`px-2 md:px-1.5 py-0.5 md:py-0.2 rounded-full text-[12px] md:text-[11px] font-bold border ${
                     alertCircles.urgent.length > 0 || alertCircles.newLeads.length > 0
                       ? 'bg-rose-50 text-rose-600 border-rose-200'
                       : 'bg-indigo-50 text-indigo-700 border-indigo-200'
@@ -4004,7 +4030,13 @@ export const SupportChatCircles: React.FC = () => {
               </button>
             </>
           )}
-          <div className="w-9 h-9 md:w-8 md:h-8 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-[14px] md:text-[13px] flex items-center justify-center">
+          <div
+            className={`rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-[15px] md:text-[13px] flex items-center justify-center transition-all duration-200 lg:w-8 lg:h-8 lg:opacity-100 lg:scale-100 lg:ml-0 ${
+              mobileListScrolled
+                ? 'w-0 h-0 opacity-0 scale-75 overflow-hidden border-0 -ml-2 pointer-events-none'
+                : 'w-10 h-10 md:w-8 md:h-8 opacity-100 scale-100'
+            }`}
+          >
             {initials(profile?.full_name || 'AD')}
           </div>
         </div>
@@ -4014,20 +4046,20 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── LEFT: chat list (Responsive on Tablet/Mobile + Collapsible on Desktop) ── */}
         <aside
           style={{ ['--left-w' as any]: `${leftPanelWidth}px` }}
-          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] pt-14 lg:pt-0 ${
+          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] pt-[60px] md:pt-12 lg:pt-0 ${
             mobileChatOpen && activeCircle ? 'hidden' : 'flex'
           } ${leftListCollapsed ? 'lg:hidden' : 'lg:flex'}`}
         >
-          <div className="px-4 pt-3 pb-2.5 md:px-3.5 md:pt-2.5 md:pb-1.5 border-b border-slate-100 space-y-2.5 md:space-y-1.5 relative">
+          <div className="px-4 pt-3.5 pb-3 md:px-3.5 md:pt-2.5 md:pb-1.5 border-b border-slate-100 space-y-3 md:space-y-1.5 relative">
             <div className="flex items-center gap-2 md:gap-1.5">
               <div className="relative flex-1">
-                <Search className="w-4.5 h-4.5 md:w-4 md:h-4 text-slate-400 absolute left-3.5 md:left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-5 h-5 md:w-4 md:h-4 text-slate-400 absolute left-3.5 md:left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar cliente, grupo o teléfono..."
-                  className="w-full pl-10 md:pl-9 pr-8 py-2.5 md:py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-[15px] md:text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  placeholder="Buscar chat o tel..."
+                  className="w-full pl-11 md:pl-9 pr-9 py-3 md:py-1.5 bg-slate-50 border border-slate-200/80 rounded-2xl md:rounded-xl text-[16px] md:text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 {searchQuery && (
                   <button
@@ -4047,24 +4079,32 @@ export const SupportChatCircles: React.FC = () => {
                   (channelFilter !== 'all' ? 1 : 0) +
                   (stateFilters.includes('replied') ? 1 : 0) +
                   (specialTray !== null ? 1 : 0);
+                const mobileExtraFilterCount = extraFilterCount + (selectedBuckets.length > 0 ? 1 : 0);
                 return (
                   <button
                     type="button"
                     onClick={() => setShowFilterMenu((v) => !v)}
-                    className={`px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl border text-[13.5px] md:text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
-                      extraFilterCount > 0
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    className={`px-3.5 py-3 md:px-2.5 md:py-1.5 rounded-2xl md:rounded-xl border text-[15px] md:text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                      mobileExtraFilterCount > 0
+                        ? extraFilterCount > 0
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-indigo-50 md:bg-white md:hover:bg-slate-50 text-indigo-700 md:text-slate-700 border-indigo-200 md:border-slate-200/90'
                         : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
                     }`}
                   >
-                    <Filter className="w-4 h-4 md:w-3.5 md:h-3.5 text-slate-500" />
+                    <Filter className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-slate-500" />
                     <span>Filtros</span>
+                    {mobileExtraFilterCount > 0 && (
+                      <span className="md:hidden px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[11px] font-bold leading-tight">
+                        {mobileExtraFilterCount}
+                      </span>
+                    )}
                     {extraFilterCount > 0 && (
-                      <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-tight">
+                      <span className="hidden md:inline-block px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-tight">
                         {extraFilterCount}
                       </span>
                     )}
-                    <ChevronDown className="w-3.5 h-3.5 md:w-3 md:h-3 text-slate-400" />
+                    <ChevronDown className="w-4 h-4 md:w-3 md:h-3 text-slate-400" />
                   </button>
                 );
               })()}
@@ -4091,6 +4131,104 @@ export const SupportChatCircles: React.FC = () => {
                   <button type="button" onClick={() => setShowFilterMenu(false)} className="p-1.5 md:p-0 text-slate-400 hover:text-slate-600">
                     <X className="w-4.5 h-4.5 md:w-3 md:h-3" />
                   </button>
+                </div>
+
+                {/* Bandejas en móvil (evita saturar la barra superior) */}
+                <div className="md:hidden pb-1.5 mb-1 border-b border-slate-100 space-y-0.5">
+                  <div className="px-3 py-1 text-[12px] font-bold uppercase tracking-wider text-slate-400">Bandeja</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSpecialTray(null);
+                      setSelectedBuckets([]);
+                      setLeadSubFilter('activos');
+                      setShowFilterMenu(false);
+                    }}
+                    className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
+                      specialTray === null && selectedBuckets.length === 0
+                        ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                        : 'text-slate-700 hover:bg-slate-50 font-medium'
+                    }`}
+                  >
+                    <span>Todas las conversaciones</span>
+                    <span className="text-[14.5px] font-semibold text-slate-400">{counts.all}</span>
+                  </button>
+                  {scopes.soporte && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSpecialTray(null);
+                        setLeadSubFilter('activos');
+                        setSelectedBuckets(['soporte']);
+                        setShowFilterMenu(false);
+                      }}
+                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
+                        specialTray === null && selectedBuckets.includes('soporte')
+                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span>Soporte</span>
+                      <span className="text-[14.5px] font-semibold text-slate-400">{counts.soporte}</span>
+                    </button>
+                  )}
+                  {scopes.leads && scopes.leadsPool && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSpecialTray(null);
+                        setLeadSubFilter('activos');
+                        setSelectedBuckets(['por_clasificar']);
+                        setShowFilterMenu(false);
+                      }}
+                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
+                        specialTray === null && selectedBuckets.includes('por_clasificar')
+                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span>Por tomar</span>
+                      <span className="text-[14.5px] font-semibold text-slate-400">{counts.por_clasificar}</span>
+                    </button>
+                  )}
+                  {scopes.leads && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSpecialTray(null);
+                        setLeadSubFilter('activos');
+                        setSelectedBuckets(['lead']);
+                        setShowFilterMenu(false);
+                      }}
+                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
+                        specialTray === null && selectedBuckets.includes('lead')
+                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span>{scopes.all ? 'Leads' : 'Mis leads'}</span>
+                      <span className="text-[14.5px] font-semibold text-slate-400">{counts.lead}</span>
+                    </button>
+                  )}
+                  {scopes.leads && (counts.reactivatedTotal > 0 || selectedBuckets.includes('reactivados')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSpecialTray(null);
+                        setLeadSubFilter('activos');
+                        setSelectedBuckets(['reactivados']);
+                        setShowFilterMenu(false);
+                      }}
+                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
+                        specialTray === null && selectedBuckets.includes('reactivados')
+                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span>Reactivados</span>
+                      <span className="text-[14.5px] font-semibold text-indigo-600">{counts.reactivatedReplied} resp.</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Estado adicional combinable */}
@@ -4206,33 +4344,53 @@ export const SupportChatCircles: React.FC = () => {
               </>
             )}
 
-            {/* Row 1: Bandejas (1 sola fila deslizable en móvil; multi-selección en desktop) */}
-            <div className="flex items-center gap-1.5 md:gap-1 overflow-x-auto pb-0.5 md:pb-0 md:flex-wrap">
+            {/* Row 1 Mobile: Barra simple estilo WhatsApp (Todos · No leídos · Sin contestar + chips activos) */}
+            <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <button
                 type="button"
                 onClick={() => {
                   setSpecialTray(null);
                   setSelectedBuckets([]);
+                  setStateFilters([]);
+                  setOwnerFilter('all');
+                  setChannelFilter('all');
                   setLeadSubFilter('activos');
                 }}
-                className={`px-3.5 md:px-2 py-1.5 md:py-1 rounded-full md:rounded-lg text-[13px] md:text-[12px] whitespace-nowrap transition shrink-0 ${
-                  specialTray === null && selectedBuckets.length === 0 && !stateFilters.includes('waiting')
-                    ? 'bg-slate-900 md:bg-indigo-50 text-white md:text-indigo-700 font-bold'
-                    : 'text-slate-600 hover:bg-slate-50 font-medium'
+                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 ${
+                  specialTray === null && selectedBuckets.length === 0 && stateFilters.length === 0
+                    ? 'bg-slate-900 text-white font-bold'
+                    : 'bg-slate-100 text-slate-700 font-semibold'
                 }`}
               >
-                Todos ({counts.all})
+                Todos
               </button>
               <button
                 type="button"
                 onClick={() => {
                   if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
-                  setStateFilters((prev) => toggleStateFilterSelection(prev, 'waiting'));
+                  setStateFilters((prev) => (prev.includes('unread') ? [] : ['unread']));
                 }}
-                className={`md:hidden px-3.5 py-1.5 rounded-full text-[13px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
+                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
+                  stateFilters.includes('unread')
+                    ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 font-semibold'
+                }`}
+              >
+                {contextCounts.unread > 0 && !stateFilters.includes('unread') && (
+                  <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                )}
+                <span>No leídos ({contextCounts.unread})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                  setStateFilters((prev) => (prev.includes('waiting') ? [] : ['waiting']));
+                }}
+                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
                   stateFilters.includes('waiting')
-                    ? 'bg-indigo-600 text-white font-bold'
-                    : 'bg-slate-100 text-slate-700 font-medium'
+                    ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 font-semibold'
                 }`}
               >
                 <span>Sin contestar ({contextCounts.waiting})</span>
@@ -4242,18 +4400,83 @@ export const SupportChatCircles: React.FC = () => {
                   type="button"
                   onClick={() => {
                     if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
-                    setStateFilters((prev) => toggleStateFilterSelection(prev, 'failed'));
+                    setStateFilters((prev) => (prev.includes('failed') ? [] : ['failed']));
                   }}
-                  className={`md:hidden px-3.5 py-1.5 rounded-full text-[13px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
+                  className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
                     stateFilters.includes('failed')
                       ? 'bg-rose-600 text-white font-bold'
                       : 'bg-rose-50 text-rose-700 border border-rose-200 font-semibold'
                   }`}
                 >
-                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <AlertTriangle className="w-4 h-4" />
                   <span>No enviados ({contextCounts.failed})</span>
                 </button>
               )}
+              {selectedBuckets.map((b) => {
+                const label =
+                  b === 'soporte'
+                    ? 'Soporte'
+                    : b === 'por_clasificar'
+                    ? 'Por tomar'
+                    : b === 'reactivados'
+                    ? 'Reactivados'
+                    : scopes.all
+                    ? 'Leads'
+                    : 'Mis leads';
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => {
+                      setSelectedBuckets((prev) => prev.filter((item) => item !== b));
+                      setLeadSubFilter('activos');
+                    }}
+                    className="px-3.5 py-2 rounded-full text-[14px] whitespace-nowrap shrink-0 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/80 font-bold inline-flex items-center gap-1.5"
+                  >
+                    <span>{label}</span>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                );
+              })}
+              {specialTray !== null && (
+                <button
+                  type="button"
+                  onClick={() => setSpecialTray(null)}
+                  className="px-3.5 py-2 rounded-full text-[14px] whitespace-nowrap shrink-0 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/80 font-bold inline-flex items-center gap-1.5"
+                >
+                  <span>{specialTray === 'interno' ? 'Equipo' : specialTray === 'spam' ? 'Spam' : 'Tickets'}</span>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {stateFilters.includes('replied') && (
+                <button
+                  type="button"
+                  onClick={() => setStateFilters((prev) => prev.filter((f) => f !== 'replied'))}
+                  className="px-3.5 py-2 rounded-full text-[14px] whitespace-nowrap shrink-0 bg-emerald-600 text-white font-bold inline-flex items-center gap-1.5"
+                >
+                  <span>Respondidos</span>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Row 1 Desktop: Bandejas multi-selección */}
+            <div className="hidden md:flex items-center gap-1 flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  setSpecialTray(null);
+                  setSelectedBuckets([]);
+                  setLeadSubFilter('activos');
+                }}
+                className={`px-2 py-1 rounded-lg text-[12px] whitespace-nowrap transition shrink-0 ${
+                  specialTray === null && selectedBuckets.length === 0 && !stateFilters.includes('waiting')
+                    ? 'bg-indigo-50 text-indigo-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-50 font-medium'
+                }`}
+              >
+                Todos ({counts.all})
+              </button>
               {bucketTabs.map((tab) => {
                 const active = specialTray === null && selectedBuckets.includes(tab.id);
                 return (
@@ -4265,7 +4488,7 @@ export const SupportChatCircles: React.FC = () => {
                       setLeadSubFilter('activos');
                       setSelectedBuckets((prev) => toggleBucketSelection(prev, tab.id));
                     }}
-                    className={`px-3.5 md:px-2 py-1.5 md:py-1 rounded-full md:rounded-lg text-[13px] md:text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
+                    className={`px-2 py-1 rounded-lg text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -4384,7 +4607,7 @@ export const SupportChatCircles: React.FC = () => {
             {(singleBucket === 'reactivados' || singleBucket === 'lead') && (
               <div className="pt-1 border-t border-slate-100 space-y-1.5">
                 {singleBucket === 'reactivados' && counts.reactivatedTotal > 0 && (
-                  <div className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 text-[11.5px] text-slate-600">
+                  <div className="hidden md:flex px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 items-center justify-between gap-2 text-[11.5px] text-slate-600">
                     <div className="min-w-0 truncate">
                       <span>
                         Respondieron: <b className="text-slate-900">{counts.reactivatedReplied}/{counts.reactivatedTotal}</b>{' '}
@@ -4417,7 +4640,7 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex items-center gap-1 flex-wrap">
+                <div className="flex items-center gap-1.5 md:gap-1 overflow-x-auto flex-nowrap md:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {(
                     [
                       {
@@ -4439,12 +4662,13 @@ export const SupportChatCircles: React.FC = () => {
                     .filter((sf) => sf.show)
                     .map((sf) => {
                       const active = leadSubFilter === sf.id;
+                      const hideOnMobile = sf.id === 'perdidos' || sf.id === 'erroneos';
                       return (
                         <button
                           key={sf.id}
                           type="button"
                           onClick={() => setLeadSubFilter(sf.id)}
-                          className={`px-2 py-0.5 rounded-md text-[12px] transition ${
+                          className={`${hideOnMobile ? 'hidden md:inline-flex' : 'inline-flex'} items-center px-3 py-1.5 md:px-2 md:py-0.5 rounded-full md:rounded-md text-[13px] md:text-[12px] whitespace-nowrap shrink-0 transition ${
                             active
                               ? 'bg-slate-800 text-white font-semibold'
                               : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 font-medium'
@@ -4497,7 +4721,7 @@ export const SupportChatCircles: React.FC = () => {
             )}
           </div>
 
-          <div className="flex-1 lg:overflow-y-auto divide-y divide-slate-100" onScroll={handleCirclesScroll}>
+          <div className="flex-1 lg:overflow-y-auto divide-y divide-slate-100 pb-24 lg:pb-0" onScroll={handleCirclesScroll}>
             {loading && circles.length === 0 ? (
               <div className="p-8 text-center text-[13px] text-slate-400 font-medium">Cargando chats…</div>
             ) : filteredCircles.length === 0 ? (

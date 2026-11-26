@@ -132,34 +132,32 @@ export default function MobileNav() {
                 </div>
             )}
 
-            {/* ── Bottom Navigation Bar ── */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[100] pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-                <div className="flex items-center justify-around h-18">
+            {/* ── Bottom Navigation Bar (iOS 26 Liquid Glass Floating Dock) ── */}
+            <div
+                className="md:hidden fixed bottom-0 left-0 right-0 z-[100] px-3 pointer-events-none"
+                style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+            >
+                <nav className="pointer-events-auto mx-auto max-w-md h-[64px] px-2 rounded-full bg-white/65 supports-[backdrop-filter]:bg-white/52 backdrop-blur-2xl backdrop-saturate-180 border border-white/85 ring-1 ring-slate-900/[0.07] shadow-[0_12px_34px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.92)] flex items-center justify-around">
                     {tabs.map((tab, idx) => {
                         const isTabActive = tab.current;
+                        const isActive = tab.isCreate ? showActionSheet : isTabActive;
                         const Icon = tab.icon!;
 
                         const content = (
                             <div className={cn(
-                                "flex flex-col items-center justify-center py-1 transition-all relative",
-                                tab.isCreate
-                                    ? showActionSheet ? "text-[#4449AA]" : "text-gray-500"
-                                    : tab.href === '/support/chat' && isTabActive
-                                    ? "text-emerald-600"
-                                    : tab.href === '/support/chat'
-                                    ? "text-gray-400"
-                                    : isTabActive ? "text-green-600" : "text-gray-400"
+                                "inline-flex flex-col items-center justify-center transition-all relative rounded-full",
+                                isActive
+                                    ? "bg-blue-600/[0.11] text-blue-600 px-3.5 py-1.5"
+                                    : "text-slate-950 px-2.5 py-1.5"
                             )}>
-                                {tab.href === '/support/chat' && isTabActive && (
-                                    <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-emerald-500 mb-1" />
-                                )}
-                                <Icon className={cn(
-                                    "w-6 h-6 mb-1",
-                                    tab.isCreate ? (showActionSheet ? "rotate-45 duration-200" : "rotate-0 duration-200") : "",
-                                    "transition-transform",
-                                    tab.href === '/support/chat' && isTabActive ? "stroke-emerald-600" : ""
-                                )} />
-                                <span className="text-[10px] font-bold uppercase tracking-tight">{tab.name}</span>
+                                <Icon
+                                    strokeWidth={isActive ? 2.25 : 1.9}
+                                    className={cn(
+                                        "w-[22px] h-[22px] mb-0.5 transition-transform",
+                                        tab.isCreate ? (showActionSheet ? "rotate-45 duration-200" : "rotate-0 duration-200") : ""
+                                    )}
+                                />
+                                <span className="text-[10px] font-bold uppercase tracking-tight leading-none">{tab.name}</span>
                             </div>
                         );
 
@@ -168,14 +166,14 @@ export default function MobileNav() {
                                 {tab.isCreate ? (
                                     <button
                                         onClick={() => setShowActionSheet(prev => !prev)}
-                                        className="w-full active:scale-90 transition-transform"
+                                        className="w-full flex justify-center active:scale-90 transition-transform"
                                     >
                                         {content}
                                     </button>
                                 ) : (
                                     <Link
                                         to={tab.href!}
-                                        className="w-full text-center"
+                                        className="w-full flex justify-center text-center"
                                         onClick={() => setShowActionSheet(false)}
                                     >
                                         {content}
@@ -184,7 +182,7 @@ export default function MobileNav() {
                             </div>
                         );
                     })}
-                </div>
+                </nav>
             </div>
         </>
     );
