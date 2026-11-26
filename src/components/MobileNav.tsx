@@ -138,8 +138,12 @@ export default function MobileNav() {
                 style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
             >
                 <nav
-                    style={{ WebkitBackdropFilter: 'blur(10px) saturate(180%)', backdropFilter: 'blur(10px) saturate(180%)' }}
-                    className="pointer-events-auto mx-auto max-w-md h-[64px] px-2 rounded-full bg-white/30 border border-white/75 ring-1 ring-slate-900/[0.06] shadow-[0_10px_30px_rgba(15,23,42,0.13),inset_0_1.5px_1px_rgba(255,255,255,0.85),inset_0_-1px_2px_rgba(15,23,42,0.05)] flex items-center justify-around"
+                    style={{
+                        WebkitBackdropFilter: 'blur(2px) saturate(140%)',
+                        backdropFilter: 'blur(2px) saturate(140%)',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.05) 55%, rgba(255,255,255,0.14) 100%)',
+                    }}
+                    className="pointer-events-auto mx-auto max-w-md h-[64px] px-2 rounded-full border border-white/80 ring-1 ring-slate-900/[0.07] shadow-[0_8px_26px_rgba(15,23,42,0.12),inset_0_1.5px_1px_rgba(255,255,255,0.92),inset_0_-1px_2px_rgba(15,23,42,0.06)] flex items-center justify-around"
                 >
                     {tabs.map((tab, idx) => {
                         const isTabActive = tab.current;
@@ -150,7 +154,7 @@ export default function MobileNav() {
                             <div className={cn(
                                 "inline-flex flex-col items-center justify-center transition-all relative rounded-full",
                                 isActive
-                                    ? "bg-blue-600/[0.12] text-blue-600 px-3.5 py-1.5"
+                                    ? "bg-blue-600/[0.13] text-blue-600 px-3.5 py-1.5"
                                     : "text-slate-950 px-2.5 py-1.5"
                             )}>
                                 <Icon
