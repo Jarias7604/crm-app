@@ -177,11 +177,11 @@ const hdr = (code = 'SOP-COM-2026-04 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Marketing y Redes Sociales / Versión 1.5 · Planning + Meta Ads + ROI (Cerrado/Cliente) + MTD + YouTube + MCP</span>
+    <span>Marketing y Redes Sociales / Versión 1.6 · Planning + Meta Ads + ROI Estilo Metricool + Cohorte &amp; Orígenes CRM + MCP</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI, YouTube y ChatGPT Plus (MCP + OAuth 2.1)')}
+const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Estilo Metricool, YouTube y ChatGPT Plus')}
 
 <!-- PAGE 1: COVER -->
 <section class="page">
@@ -190,12 +190,12 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI, Y
     <div style="margin-top:34px;">
       <div class="kicker">MARKETING Y REDES SOCIALES / PROCEDIMIENTO ESTÁNDAR DE OPERACIÓN</div>
       <div class="cover-title">Social Planning, Meta Ads ROI,<br/>YouTube y ChatGPT Plus</div>
-      <div class="cover-sub">Suite editorial y analítica Meta Ads (inversión, impresiones, clics, formularios, ROI vs Cerrado/Cliente y MTD) con Servidor MCP</div>
+      <div class="cover-sub">Suite editorial y analítica estilo Metricool con ROI (Ads/IA vs Ventas Cerrado/Cliente), Cohorte de Ingreso CRM y Servidor MCP</div>
 
       <div class="kicker" style="margin-top:24px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.5 · Panel ROI (Inversión Ads/IA vs Ventas Cerrado/Cliente) + Gráfica ROI diaria + Estadísticas Meta Ads &amp; MTD</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.6 · Rediseño Analítica Estilo Metricool + Atribución Meta/Redes Sociales + Cohorte Ingreso vs Cierre CRM</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">27 de noviembre de 2026</td></tr>
         <tr><td class="kv-key">URL Servidor MCP</td><td class="kv-val"><code>https://www.ariascrm.com/mcp</code> (Streamable HTTP + PKCE S256)</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag <code>ai_content_studio_enabled</code>)</td></tr>
@@ -330,9 +330,9 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI, Y
           <td>Permite publicar o mover varios posts a Eliminados en lote, conservando auditoría de fecha/usuario y botón <em>Restaurar</em> en 1 clic.</td>
         </tr>
         <tr>
-          <td><strong>Estadísticas, Meta Ads &amp; ROI</strong></td>
-          <td><code>meta-ads-insights</code> (solo lectura) + MTD</td>
-          <td>Conecta cuentas publicitarias (OAuth <code>ads_read</code> o Token Permanente) sin alterar <code>meta-oauth</code> ni Metricool. Cruza inversión Meta Ads + IA contra ventas ganadas CRM (<code>Cerrado</code> / <code>Cliente</code> por <code>internal_won_date</code>) calculando Utilidad Neta, ROI %, ROAS y CAC.</td>
+          <td><strong>Estadísticas, ROI &amp; Cohorte</strong></td>
+          <td><code>meta-ads-insights</code> (solo lectura) + UI estilo Metricool</td>
+          <td>Interfaz limpia en 3 sub-vistas (<em>Resumen &amp; ROI</em>, <em>Campañas Meta</em>, <em>Ventas &amp; Cohorte</em>). Separa origen (<code>Meta Ads</code>, <code>Redes Sociales</code>, <code>Otros</code>) y cohorte (<code>Mismo período</code> vs <code>Mes anterior</code>) con fecha ingreso CRM, fecha cierre, días y acceso directo al lead.</td>
         </tr>
         <tr>
           <td><strong>Filtro Este Mes (MTD)</strong></td>
@@ -451,9 +451,9 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI, Y
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.5 / 27 Nov. 2026</td><td>Agrega <strong>Panel de Retorno de Inversión (ROI)</strong> en <strong>Estadísticas &amp; Ads</strong> (Inversión Ads + IA vs Ventas Ganadas <code>Cerrado</code>/<code>Cliente</code> por fecha de cierre real), gráfica diaria <em>Inversión vs Ganado (\$USD)</em>, filtro <em>Todas las ventas vs Solo origen Meta/FB</em> y tabla auditable de cierres.</td><td>Vigente en producción</td></tr>
-        <tr><td>1.4 / 27 Nov. 2026</td><td>Agrega pestaña <strong>Estadísticas &amp; Ads</strong> (inversión Meta Ads, impresiones, clics, formularios llenados, CPL y cruce CRM/IA), tarjeta activa Meta Ads aislada en Conexiones y filtro <strong>Este Mes (MTD)</strong> en <code>/reports</code>.</td><td>Superada por v1.5</td></tr>
-        <tr><td>1.3 / Nov. 2026</td><td>Integración YouTube Multi-Canal (<code>youtube-oauth</code> + <code>publish-youtube</code>), selector de canales en 2 clics, vista previa YouTube en vivo y simplificación de acceso en Social Hub.</td><td>Superada por v1.4</td></tr>
+        <tr><td>1.6 / 27 Nov. 2026</td><td>Rediseño limpio estilo Metricool en 3 sub-vistas (<em>Resumen &amp; ROI</em>, <em>Campañas Meta</em>, <em>Ventas &amp; Cohorte</em>), atribución exacta <code>Redes Sociales</code> vs <code>Meta Ads</code> vs <code>Otros</code> y detalle de fecha de ingreso CRM, fecha de cierre, cohorte y días en cerrar.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.5 / 27 Nov. 2026</td><td>Agrega <strong>Panel de Retorno de Inversión (ROI)</strong> en <strong>Estadísticas &amp; Ads</strong> (Inversión Ads + IA vs Ventas Ganadas <code>Cerrado</code>/<code>Cliente</code> por fecha de cierre real) y gráfica diaria <em>Inversión vs Ganado (\$USD)</em>.</td><td>Superada por v1.6</td></tr>
+        <tr><td>1.4 / 27 Nov. 2026</td><td>Agrega pestaña <strong>Estadísticas &amp; Ads</strong> (inversión Meta Ads, impresiones, clics, formularios llenados, CPL y cruce CRM/IA) y filtro <strong>Este Mes (MTD)</strong> en <code>/reports</code>.</td><td>Superada por v1.5</td></tr>
       </tbody>
     </table>
   </div>
@@ -632,7 +632,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI, Y
   ${ftr(10, 12)}
 </section>
 
-<!-- PAGE 11: 10 / PROCEDIMIENTO VISUAL (Panel ROI + Meta Ads KPIs + Gráfica/Tablas) -->
+<!-- PAGE 11: 10 / PROCEDIMIENTO VISUAL (Resumen & ROI Estilo Metricool + Ventas & Cohorte CRM) -->
 <section class="page">
   <div>
     <div class="top-rule" style="margin-bottom:10px;">
@@ -640,28 +640,28 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI, Y
       <span class="doc-code">SOP-COM-2026-04 | Uso interno</span>
     </div>
     <div class="kicker">10 / PROCEDIMIENTO VISUAL</div>
-    <h1 class="sec-h1" style="font-size:18.5px;">Panel ROI Meta Ads vs Ventas Ganadas (Cerrado / Cliente)</h1>
-    <p class="lead-p" style="margin-bottom:5px;">Evaluación directa por rango de fechas comparando inversión total (Ads + IA) contra cierres reales del CRM.</p>
+    <h1 class="sec-h1" style="font-size:18.5px;">Analítica Estilo Metricool: Resumen ROI y Cohorte de Ventas CRM</h1>
+    <p class="lead-p" style="margin-bottom:5px;">Evaluación ordenada por rango de fechas, origen exacto (<em>Meta Ads</em>, <em>Redes Sociales</em>, <em>Otros</em>) y maduración del prospecto.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Leer el Panel ROI (Utilidad Neta, ROI %, ROAS, CAC) y los 6 KPIs</div>
-    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads</strong>, elija <strong>Este Mes (MTD)</strong> u otro rango y alterne entre <em>Todas las ventas CRM</em> y <em>Solo origen Meta / FB</em> sin afectar sus campañas ni Metricool.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Leer Resumen &amp; ROI con los 4 indicadores pastel y filtros de origen/cohorte</div>
+    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads → Resumen &amp; ROI</strong>, combine <strong>Origen</strong> y <strong>Cohorte</strong> para evaluar utilidad neta, ROI %, ROAS y evolución diaria al estilo Metricool.</p>
     <div class="shot-frame compact" style="width:76%;">
-      <img src="${pAnalytics}" alt="Panel ROI e Indicadores Meta Ads en Social Planning" />
-      <div class="callout-box" style="left:20.5%;top:20.4%;width:76.2%;height:11.2%;"><span class="callout-tag">1. Filtros de fecha (MTD / Rango) y cuenta Arias Group</span></div>
-      <div class="callout-box" style="left:20.5%;top:33.4%;width:76.2%;height:28.2%;"><span class="callout-tag bottom right">2. Panel ROI (+120.7% · \$994.85 vs \$450.82)</span></div>
-      <div class="callout-box" style="left:20.5%;top:65.2%;width:76.2%;height:16.0%;"><span class="callout-tag bottom">3. 6 KPIs (Inversión, Impresiones, Clics, Forms, CRM e IA)</span></div>
+      <img src="${pAnalytics}" alt="Vista Resumen y ROI estilo Metricool en Social Planning" />
+      <div class="callout-box" style="left:20.5%;top:19.6%;width:76.2%;height:10.4%;"><span class="callout-tag">1. Sub-vistas (Resumen, Campañas, Ventas) y Fechas</span></div>
+      <div class="callout-box" style="left:20.5%;top:37.8%;width:76.2%;height:13.8%;"><span class="callout-tag bottom">2. 4 Indicadores Pastel (Inversión, Ganado, ROI, Formularios)</span></div>
+      <div class="callout-box" style="left:20.5%;top:56.0%;width:76.2%;height:39.4%;"><span class="callout-tag" style="top:auto;bottom:6px;right:8px;left:auto;">3. Gráfica diaria Inversión vs Ganado</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Panel ejecutivo de Retorno de Inversión (ROI) y 6 KPIs en vivo para Arias Group (Este Mes MTD).</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Vista principal estilo Metricool con sub-pestañas ordenadas, 4 indicadores pastel y gráfica limpia de evolución diaria.</div>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">12 ·</span> Auditar evolución diaria, campañas Meta Ads y ventas Cerrado / Cliente</div>
-    <p class="body-p" style="margin-bottom:3px;">Compare barra vs línea en <strong>Inversión vs Ganado (\$)</strong>, analice el CPL por campaña y verifique cada trato cerrado incluido en el cálculo de ROI.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">12 ·</span> Auditar fecha de ingreso CRM, fecha de cierre, días y origen en Ventas &amp; Cohorte</div>
+    <p class="body-p" style="margin-bottom:3px;">En la sub-pestaña <strong>Ventas &amp; Cohorte</strong>, verifique qué cierres ingresaron en el mismo mes frente a meses anteriores, su origen real y ábralos directo en el CRM.</p>
     <div class="shot-frame compact" style="width:76%;">
-      <img src="${pRoiCierres}" alt="Gráfica diaria ROI, Desglose por Campaña y Ventas Ganadas CRM" />
-      <div class="callout-box" style="left:20.5%;top:0.5%;width:76.2%;height:39.2%;"><span class="callout-tag" style="top:6px;left:45%;">1. Gráfica Inversión vs Ganado y Embudo</span></div>
-      <div class="callout-box" style="left:20.5%;top:41.2%;width:76.2%;height:24.8%;"><span class="callout-tag" style="top:4px;left:38%;">2. Desglose por Campaña (Meta Ads)</span></div>
-      <div class="callout-box" style="left:20.5%;top:68.0%;width:76.2%;height:29.5%;"><span class="callout-tag" style="top:4px;left:56%;">3. Ventas Ganadas CRM</span></div>
+      <img src="${pRoiCierres}" alt="Sub-pestaña Ventas y Cohorte CRM con fecha ingreso, cierre y origen exacto" />
+      <div class="callout-box" style="left:20.5%;top:19.6%;width:76.2%;height:10.4%;"><span class="callout-tag">1. Pestaña Ventas &amp; Cohorte (3) y período</span></div>
+      <div class="callout-box" style="left:20.5%;top:32.0%;width:76.2%;height:12.6%;"><span class="callout-tag bottom right">2. Resumen Cohorte (\$220.35 mismo mes · \$774.50 ant.)</span></div>
+      <div class="callout-box" style="left:20.5%;top:49.4%;width:76.2%;height:45.0%;"><span class="callout-tag bottom">3. Auditoría: Ingreso CRM, Cierre, Días, Origen y Abrir</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 12. Gráfica diaria Inversión vs Ganado, rendimiento por campaña y tabla auditable de cierres reales del período.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 12. Auditoría exacta de ventas ganadas separando ingreso CRM vs cierre, días de maduración y origen exacto.</div>
   </div>
   ${ftr(11, 12)}
 </section>
