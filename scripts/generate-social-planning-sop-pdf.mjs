@@ -37,6 +37,7 @@ const pDel = loadShot(SOCIAL_SHOTS, 'p_05_planning_eliminados.png');
 const pModal = loadShot(SOCIAL_SHOTS, 'p_06_modal_conectar_chatgpt.png');
 const pAnalytics = loadShot(SOCIAL_SHOTS, 'p_07_planning_estadisticas_ads.png');
 const pReportsMtd = loadShot(SOCIAL_SHOTS, 'p_08_reports_mtd.png');
+const pRoiCierres = loadShot(SOCIAL_SHOTS, 'p_09_planning_roi_cierres.png');
 
 const cAddMcp = loadShot(SOCIAL_SHOTS, 'c_01_chatgpt_plugins_add_mcp.png');
 const cOauth = loadShot(SOCIAL_SHOTS, 'c_02_crm_oauth_autorizar.png');
@@ -176,11 +177,11 @@ const hdr = (code = 'SOP-COM-2026-04 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Marketing y Redes Sociales / Versión 1.4 · Planning + Meta Ads + Estadísticas &amp; MTD + YouTube + MCP</span>
+    <span>Marketing y Redes Sociales / Versión 1.5 · Planning + Meta Ads + ROI (Cerrado/Cliente) + MTD + YouTube + MCP</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTube y ChatGPT Plus (MCP + OAuth 2.1)')}
+const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI, YouTube y ChatGPT Plus (MCP + OAuth 2.1)')}
 
 <!-- PAGE 1: COVER -->
 <section class="page">
@@ -188,13 +189,13 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     ${hdr()}
     <div style="margin-top:34px;">
       <div class="kicker">MARKETING Y REDES SOCIALES / PROCEDIMIENTO ESTÁNDAR DE OPERACIÓN</div>
-      <div class="cover-title">Social Planning, Meta Ads,<br/>YouTube y ChatGPT Plus</div>
-      <div class="cover-sub">Suite editorial y analítica Meta Ads (inversión, impresiones, clics, formularios, MTD) con Servidor MCP</div>
+      <div class="cover-title">Social Planning, Meta Ads ROI,<br/>YouTube y ChatGPT Plus</div>
+      <div class="cover-sub">Suite editorial y analítica Meta Ads (inversión, impresiones, clics, formularios, ROI vs Cerrado/Cliente y MTD) con Servidor MCP</div>
 
       <div class="kicker" style="margin-top:24px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.4 · Pestaña Estadísticas &amp; Meta Ads + Filtro Este Mes (MTD) + YouTube + MCP OAuth 2.1</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.5 · Panel ROI (Inversión Ads/IA vs Ventas Cerrado/Cliente) + Gráfica ROI diaria + Estadísticas Meta Ads &amp; MTD</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">27 de noviembre de 2026</td></tr>
         <tr><td class="kv-key">URL Servidor MCP</td><td class="kv-val"><code>https://www.ariascrm.com/mcp</code> (Streamable HTTP + PKCE S256)</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag <code>ai_content_studio_enabled</code>)</td></tr>
@@ -215,7 +216,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
       <p class="body-p" style="color:#475569;">Distribución prevista: Dirección, Marketing y Administración SaaS.</p>
     </div>
   </div>
-  ${ftr(1, 11)}
+  ${ftr(1, 12)}
 </section>
 
 <!-- PAGE 2: 01 / MARCO OPERATIVO -->
@@ -278,7 +279,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     <p class="body-p"><strong>Resultado esperado:</strong> flujo completo desde la creación en ChatGPT hasta publicación o programación visual en Calendario por Horas, con vista previa real antes de publicar.</p>
     <p class="body-p"><strong>Aislamiento SaaS:</strong> cualquier empresa con <code>ai_content_studio_enabled = false</code> no visualiza el módulo ni puede autorizar ChatGPT (HTTP 403 en servidor).</p>
   </div>
-  ${ftr(2, 11)}
+  ${ftr(2, 12)}
 </section>
 
 <!-- PAGE 3: 02 / CONFIGURACIÓN -->
@@ -329,9 +330,9 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
           <td>Permite publicar o mover varios posts a Eliminados en lote, conservando auditoría de fecha/usuario y botón <em>Restaurar</em> en 1 clic.</td>
         </tr>
         <tr>
-          <td><strong>Estadísticas &amp; Meta Ads</strong></td>
+          <td><strong>Estadísticas, Meta Ads &amp; ROI</strong></td>
           <td><code>meta-ads-insights</code> (solo lectura) + MTD</td>
-          <td>Conecta cuentas publicitarias (OAuth <code>ads_read</code> o Token Permanente) sin alterar <code>meta-oauth</code> ni aparecer en destinos de publicación. Cruza inversión, impresiones, clics, formularios (CPL), Leads CRM y Consumo OpenAI.</td>
+          <td>Conecta cuentas publicitarias (OAuth <code>ads_read</code> o Token Permanente) sin alterar <code>meta-oauth</code> ni Metricool. Cruza inversión Meta Ads + IA contra ventas ganadas CRM (<code>Cerrado</code> / <code>Cliente</code> por <code>internal_won_date</code>) calculando Utilidad Neta, ROI %, ROAS y CAC.</td>
         </tr>
         <tr>
           <td><strong>Filtro Este Mes (MTD)</strong></td>
@@ -344,7 +345,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     <h3 class="sub-h">Criterio multi-empresa y costo \$0 API</h3>
     <p class="body-p">La generación visual se ejecuta con el motor nativo de <strong>ChatGPT Plus (\$20/mes)</strong> conectado mediante <em>Plugins → Custom MCP server</em> (<code>https://www.ariascrm.com/mcp</code>), sin gasto adicional de API de imágenes y preservando intacto el módulo clásico <strong>Social Media Hub</strong> (<code>/marketing/social</code>).</p>
   </div>
-  ${ftr(3, 11)}
+  ${ftr(3, 12)}
 </section>
 
 <!-- PAGE 4: 03 / EJECUCIÓN -->
@@ -376,7 +377,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     <div class="step-hdr"><span class="num">01 ·</span> Vincular todos los canales necesarios (Iclesia, Arias Defense o clientes SaaS)</div>
     <p class="body-p">En <strong>Planning → Conexiones</strong>, pulsar <strong>+ Conectar canal de YouTube</strong>, elegir la cuenta Google y seleccionar el canal (ej. <em>Iclesia</em>). Repetir 1 vez para agregar otro canal (ej. <em>Arias Defense Components</em>) sin configurar llaves ni APIs manuales.</p>
   </div>
-  ${ftr(4, 11)}
+  ${ftr(4, 12)}
 </section>
 
 <!-- PAGE 5: 04 / CONTROL OPERATIVO Y SUPERVISIÓN -->
@@ -450,13 +451,13 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.4 / 27 Nov. 2026</td><td>Agrega pestaña <strong>Estadísticas &amp; Ads</strong> (inversión Meta Ads, impresiones, clics, formularios llenados, CPL y cruce CRM/IA), tarjeta activa Meta Ads aislada en Conexiones y filtro <strong>Este Mes (MTD)</strong> en <code>/reports</code>.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.5 / 27 Nov. 2026</td><td>Agrega <strong>Panel de Retorno de Inversión (ROI)</strong> en <strong>Estadísticas &amp; Ads</strong> (Inversión Ads + IA vs Ventas Ganadas <code>Cerrado</code>/<code>Cliente</code> por fecha de cierre real), gráfica diaria <em>Inversión vs Ganado (\$USD)</em>, filtro <em>Todas las ventas vs Solo origen Meta/FB</em> y tabla auditable de cierres.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.4 / 27 Nov. 2026</td><td>Agrega pestaña <strong>Estadísticas &amp; Ads</strong> (inversión Meta Ads, impresiones, clics, formularios llenados, CPL y cruce CRM/IA), tarjeta activa Meta Ads aislada en Conexiones y filtro <strong>Este Mes (MTD)</strong> en <code>/reports</code>.</td><td>Superada por v1.5</td></tr>
         <tr><td>1.3 / Nov. 2026</td><td>Integración YouTube Multi-Canal (<code>youtube-oauth</code> + <code>publish-youtube</code>), selector de canales en 2 clics, vista previa YouTube en vivo y simplificación de acceso en Social Hub.</td><td>Superada por v1.4</td></tr>
-        <tr><td>1.2 / Nov. 2026</td><td>Rediseño UX/UI comercial completo (Calendario por Horas, Mejores horarios, Vista Lista con acciones en lote y Compositor 2 columnas).</td><td>Versión base</td></tr>
       </tbody>
     </table>
   </div>
-  ${ftr(5, 11)}
+  ${ftr(5, 12)}
 </section>
 
 <!-- PAGE 6: 05 / PROCEDIMIENTO VISUAL (Calendario Horario + Lista) -->
@@ -492,7 +493,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 2. Tabla comercial con íconos oficiales por red, origen ChatGPT, indicador de estado y menú contextual.</div>
   </div>
-  ${ftr(6, 11)}
+  ${ftr(6, 12)}
 </section>
 
 <!-- PAGE 7: 06 / PROCEDIMIENTO VISUAL (Editor 2 Columnas + Conexiones) -->
@@ -527,7 +528,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 4. Panel de Conexiones actualizado con Facebook, Instagram, YouTube Multi-Canal y tarjeta activa Meta Ads.</div>
   </div>
-  ${ftr(7, 11)}
+  ${ftr(7, 12)}
 </section>
 
 <!-- PAGE 8: 07 / PROCEDIMIENTO VISUAL (Eliminados + Modal ChatGPT MCP) -->
@@ -561,7 +562,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 6. Modal comercial del Conector ChatGPT Plus con enlace MCP único y control de permisos por integrante.</div>
   </div>
-  ${ftr(8, 11)}
+  ${ftr(8, 12)}
 </section>
 
 <!-- PAGE 9: 08 / PROCEDIMIENTO VISUAL (Configurar Plugin MCP y Autorizar OAuth en 1 clic) -->
@@ -596,7 +597,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 8. Pantalla oficial de consentimiento OAuth 2.1 garantizando aislamiento estricto multi-empresa.</div>
   </div>
-  ${ftr(9, 11)}
+  ${ftr(9, 12)}
 </section>
 
 <!-- PAGE 10: 09 / PROCEDIMIENTO VISUAL (Plugin Conectado, Prueba Real & Privacidad) -->
@@ -628,10 +629,10 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 10. Consulta real ejecutada desde ChatGPT Plus devolviendo las páginas conectadas de Arias Defense.</div>
   </div>
-  ${ftr(10, 11)}
+  ${ftr(10, 12)}
 </section>
 
-<!-- PAGE 11: 10 / PROCEDIMIENTO VISUAL (Estadísticas & Meta Ads + Reportes BI MTD) -->
+<!-- PAGE 11: 10 / PROCEDIMIENTO VISUAL (Panel ROI + Meta Ads KPIs + Gráfica/Tablas) -->
 <section class="page">
   <div>
     <div class="top-rule" style="margin-bottom:10px;">
@@ -639,32 +640,69 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTu
       <span class="doc-code">SOP-COM-2026-04 | Uso interno</span>
     </div>
     <div class="kicker">10 / PROCEDIMIENTO VISUAL</div>
-    <h1 class="sec-h1" style="font-size:18.5px;">Estadísticas Meta Ads y Filtro Este Mes (MTD)</h1>
-    <p class="lead-p" style="margin-bottom:5px;">Monitoreo conjunto de inversión publicitaria, clics, formularios, embudo CRM y consumo OpenAI IA.</p>
+    <h1 class="sec-h1" style="font-size:18.5px;">Panel ROI Meta Ads vs Ventas Ganadas (Cerrado / Cliente)</h1>
+    <p class="lead-p" style="margin-bottom:5px;">Evaluación directa por rango de fechas comparando inversión total (Ads + IA) contra cierres reales del CRM.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Analizar inversión Meta Ads, formularios y leads CRM en Estadísticas &amp; Ads</div>
-    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads</strong>, elija el rango (<strong>Este Mes MTD</strong>, Hoy, 7d, 30d o personalizado) para revisar los 6 KPIs, evolución diaria y campañas.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Leer el Panel ROI (Utilidad Neta, ROI %, ROAS, CAC) y los 6 KPIs</div>
+    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads</strong>, elija <strong>Este Mes (MTD)</strong> u otro rango y alterne entre <em>Todas las ventas CRM</em> y <em>Solo origen Meta / FB</em> sin afectar sus campañas ni Metricool.</p>
     <div class="shot-frame compact" style="width:76%;">
-      <img src="${pAnalytics}" alt="Pestaña Estadísticas & Ads en Social Planning" />
-      <div class="callout-box" style="left:20.6%;top:19.6%;width:76.2%;height:11.4%;"><span class="callout-tag">1. Filtros de fecha (MTD / Rango) y Conectar Meta Ads</span></div>
-      <div class="callout-box" style="left:20.6%;top:47.0%;width:76.2%;height:16.0%;"><span class="callout-tag">2. 6 KPIs (Inversión, Impresiones, Clics, Formularios, CRM, IA)</span></div>
-      <div class="callout-box" style="left:20.6%;top:64.8%;width:76.2%;height:34.0%;"><span class="callout-tag right">3. Evolución diaria y Embudo Ads → CRM</span></div>
+      <img src="${pAnalytics}" alt="Panel ROI e Indicadores Meta Ads en Social Planning" />
+      <div class="callout-box" style="left:20.5%;top:20.4%;width:76.2%;height:11.2%;"><span class="callout-tag">1. Filtros de fecha (MTD / Rango) y cuenta Arias Group</span></div>
+      <div class="callout-box" style="left:20.5%;top:33.4%;width:76.2%;height:28.2%;"><span class="callout-tag bottom right">2. Panel ROI (+120.7% · \$994.85 vs \$450.82)</span></div>
+      <div class="callout-box" style="left:20.5%;top:65.2%;width:76.2%;height:16.0%;"><span class="callout-tag bottom">3. 6 KPIs (Inversión, Impresiones, Clics, Forms, CRM e IA)</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Pestaña Estadísticas &amp; Ads con filtro Este Mes (MTD) activo y cruce automático con Leads CRM e IA.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Panel ejecutivo de Retorno de Inversión (ROI) y 6 KPIs en vivo para Arias Group (Este Mes MTD).</div>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">12 ·</span> Auditar desempeño mensual acumulado con Este Mes (MTD) en /reports</div>
-    <p class="body-p" style="margin-bottom:3px;">En <strong>Reportes BI → Gráficos e Insights</strong>, use <strong>Este Mes (MTD)</strong> para comparar leads, valor en pipeline, cierres ganados y consumo OpenAI desde el día 1 del mes.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">12 ·</span> Auditar evolución diaria, campañas Meta Ads y ventas Cerrado / Cliente</div>
+    <p class="body-p" style="margin-bottom:3px;">Compare barra vs línea en <strong>Inversión vs Ganado (\$)</strong>, analice el CPL por campaña y verifique cada trato cerrado incluido en el cálculo de ROI.</p>
+    <div class="shot-frame compact" style="width:76%;">
+      <img src="${pRoiCierres}" alt="Gráfica diaria ROI, Desglose por Campaña y Ventas Ganadas CRM" />
+      <div class="callout-box" style="left:20.5%;top:0.5%;width:76.2%;height:39.2%;"><span class="callout-tag" style="top:6px;left:45%;">1. Gráfica Inversión vs Ganado y Embudo</span></div>
+      <div class="callout-box" style="left:20.5%;top:41.2%;width:76.2%;height:24.8%;"><span class="callout-tag" style="top:4px;left:38%;">2. Desglose por Campaña (Meta Ads)</span></div>
+      <div class="callout-box" style="left:20.5%;top:68.0%;width:76.2%;height:29.5%;"><span class="callout-tag" style="top:4px;left:56%;">3. Ventas Ganadas CRM</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 12. Gráfica diaria Inversión vs Ganado, rendimiento por campaña y tabla auditable de cierres reales del período.</div>
+  </div>
+  ${ftr(11, 12)}
+</section>
+
+<!-- PAGE 12: 11 / PROCEDIMIENTO VISUAL (Reportes BI MTD + Reglas ROI + Privacidad) -->
+<section class="page">
+  <div>
+    <div class="top-rule" style="margin-bottom:10px;">
+      <span class="brand">ARIAS GROUP</span>
+      <span class="doc-code">SOP-COM-2026-04 | Uso interno</span>
+    </div>
+    <div class="kicker">11 / REPORTES BI Y FÓRMULAS ROI</div>
+    <h1 class="sec-h1" style="font-size:18.5px;">Reportes BI (MTD), Fórmulas ROI y Control de Privacidad</h1>
+    <p class="lead-p" style="margin-bottom:6px;">Criterios contables del cálculo ROI sincronizado con Dashboard CRM y seguimiento acumulado mensual en /reports.</p>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">13 ·</span> Auditar desempeño mensual acumulado con Este Mes (MTD) en /reports</div>
+    <p class="body-p" style="margin-bottom:4px;">En <strong>Reportes BI → Gráficos e Insights</strong>, el filtro <strong>Este Mes (MTD)</strong> carga por defecto el rango del día 1 al día actual junto al consumo real de OpenAI IA.</p>
     <div class="shot-frame compact" style="width:76%;">
       <img src="${pReportsMtd}" alt="Reportes BI con filtro Este Mes MTD" />
       <div class="callout-box" style="left:65.4%;top:20.8%;width:31.4%;height:4.8%;"><span class="callout-tag">1. Filtro Este Mes (MTD) por defecto</span></div>
       <div class="callout-box" style="left:20.0%;top:41.2%;width:76.8%;height:24.0%;"><span class="callout-tag">2. Card Consumo Estimado OpenAI (MTD)</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:4px;">Figura 12. Reportes BI en modo Este Mes (MTD) mostrando totales del mes actual y consumo real de IA.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:8px;">Figura 13. Reportes BI en modo Este Mes (MTD) mostrando totales acumulados del mes actual y gasto OpenAI IA.</div>
 
-    <div class="privacy-title" style="margin-top:2px;">Control de privacidad</div>
-    <p class="body-p" style="color:#475569;margin-bottom:0;">Las capturas fueron tomadas sin exponer credenciales ni tokens publicitarios. Las métricas, tokens OAuth/Ads y cuentas conectadas son de uso exclusivo del personal autorizado de Arias Defense Components LLC.</p>
+    <h3 class="sub-h" style="margin:6px 0 4px 0;">Criterios de cálculo ROI y sincronización con Dashboard CRM</h3>
+    <table class="inst" style="margin-bottom:8px;">
+      <thead>
+        <tr><th style="width:26%;">Indicador</th><th style="width:34%;">Fórmula aplicada</th><th style="width:40%;">Fuente y regla operativa</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Inversión Total</strong></td><td><code>Inversión Meta Ads + Consumo IA</code></td><td>Gasto reportado por Meta Graph API (<code>ads_read</code>) más costo real registrado en <code>ai_usage_logs</code>.</td></tr>
+        <tr><td><strong>Ventas Ganadas</strong></td><td><code>Σ COALESCE(closing_amount, value)</code></td><td>Leads en estado <code>Cerrado</code> o <code>Cliente</code> con <code>internal_won_date</code> dentro del rango seleccionado.</td></tr>
+        <tr><td><strong>Utilidad Neta &amp; ROI %</strong></td><td><code>((Ganado − Inv.) / Inv.) × 100</code></td><td>Muestra rentabilidad real del período tanto global CRM como filtrada a origen Meta / FB.</td></tr>
+        <tr><td><strong>ROAS &amp; CAC</strong></td><td><code>ROAS = Ganado / Ads · CAC = Inv. / Cierres</code></td><td>Mide retorno bruto por dólar en pauta y costo promedio de adquisición por cliente ganado.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="privacy-title" style="margin-top:4px;">Control de privacidad</div>
+    <p class="body-p" style="color:#475569;margin-bottom:0;">Las capturas fueron tomadas sin exponer credenciales ni tokens publicitarios. La conexión Meta Ads usa permiso <code>ads_read</code> de solo lectura y no altera Metricool ni campañas activas. Uso exclusivo de Arias Defense Components LLC.</p>
   </div>
-  ${ftr(11, 11)}
+  ${ftr(12, 12)}
 </section>
 
 </body>
