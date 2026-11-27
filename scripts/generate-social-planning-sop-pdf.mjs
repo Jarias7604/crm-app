@@ -4,10 +4,9 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const WORKSPACE = process.cwd();
-const V12_SHOTS = 'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch/sop_v12_shots';
-const MCP_SHOTS = 'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch/screenshots';
+const SOCIAL_SHOTS = 'C:/Users/jaria/.gemini/antigravity/brain/f6e136e3-8fd0-4b66-a458-78558685f5ef/scratch/screenshots_social';
 const OUT_PDF = path.join(WORKSPACE, 'docs', 'SOP_Social_Planning_Conector_ChatGPT_CRM.pdf');
-const TMP_HTML = 'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch/scratch_sop_social_planning.html';
+const TMP_HTML = 'C:/Users/jaria/.gemini/antigravity/brain/f6e136e3-8fd0-4b66-a458-78558685f5ef/scratch/scratch_sop_social_planning.html';
 
 function resolveChromePath() {
   const candidates = [
@@ -30,17 +29,19 @@ function loadShot(dir, name) {
   return `data:image/png;base64,${fs.readFileSync(full).toString('base64')}`;
 }
 
-const pHourly = loadShot(V12_SHOTS, 'p_01_planning_hourly.png');
-const pList = loadShot(V12_SHOTS, 'p_02_planning_lista.png');
-const pComposer = loadShot(V12_SHOTS, 'p_03_post_composer_preview.png');
-const pConn = loadShot(V12_SHOTS, 'p_04_connections_grid.png');
-const pDel = loadShot(V12_SHOTS, 'p_05_planning_eliminados.png');
-const pModal = loadShot(V12_SHOTS, 'p_06_modal_conectar_chatgpt.png');
+const pHourly = loadShot(SOCIAL_SHOTS, 'p_01_planning_hourly.png');
+const pList = loadShot(SOCIAL_SHOTS, 'p_02_planning_lista.png');
+const pComposer = loadShot(SOCIAL_SHOTS, 'p_03_post_composer_preview.png');
+const pConn = loadShot(SOCIAL_SHOTS, 'p_04_connections_grid_v14.png');
+const pDel = loadShot(SOCIAL_SHOTS, 'p_05_planning_eliminados.png');
+const pModal = loadShot(SOCIAL_SHOTS, 'p_06_modal_conectar_chatgpt.png');
+const pAnalytics = loadShot(SOCIAL_SHOTS, 'p_07_planning_estadisticas_ads.png');
+const pReportsMtd = loadShot(SOCIAL_SHOTS, 'p_08_reports_mtd.png');
 
-const cAddMcp = loadShot(MCP_SHOTS, 'c_01_chatgpt_plugins_add_mcp.png');
-const cOauth = loadShot(MCP_SHOTS, 'c_02_crm_oauth_autorizar.png');
-const cConnected = loadShot(MCP_SHOTS, 'c_03_chatgpt_plugin_conectado.png');
-const cLive = loadShot(MCP_SHOTS, 'c_04_chatgpt_prueba_vivo.png');
+const cAddMcp = loadShot(SOCIAL_SHOTS, 'c_01_chatgpt_plugins_add_mcp.png');
+const cOauth = loadShot(SOCIAL_SHOTS, 'c_02_crm_oauth_autorizar.png');
+const cConnected = loadShot(SOCIAL_SHOTS, 'c_03_chatgpt_plugin_conectado.png');
+const cLive = loadShot(SOCIAL_SHOTS, 'c_04_chatgpt_prueba_vivo.png');
 
 const commonHead = (title) => `<!DOCTYPE html>
 <html lang="es">
@@ -175,11 +176,11 @@ const hdr = (code = 'SOP-COM-2026-04 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Marketing y Redes Sociales / Versión 1.3 · Planning + YouTube Multi-Canal + Conector MCP OAuth 2.1</span>
+    <span>Marketing y Redes Sociales / Versión 1.4 · Planning + Meta Ads + Estadísticas &amp; MTD + YouTube + MCP</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-Canal y ChatGPT Plus (MCP + OAuth 2.1)')}
+const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads, YouTube y ChatGPT Plus (MCP + OAuth 2.1)')}
 
 <!-- PAGE 1: COVER -->
 <section class="page">
@@ -187,17 +188,17 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
     ${hdr()}
     <div style="margin-top:34px;">
       <div class="kicker">MARKETING Y REDES SOCIALES / PROCEDIMIENTO ESTÁNDAR DE OPERACIÓN</div>
-      <div class="cover-title">Social Planning, YouTube y<br/>conector ChatGPT Plus</div>
-      <div class="cover-sub">Suite editorial comercial (Facebook, Instagram y YouTube multi-canal) con Servidor MCP OAuth 2.1</div>
+      <div class="cover-title">Social Planning, Meta Ads,<br/>YouTube y ChatGPT Plus</div>
+      <div class="cover-sub">Suite editorial y analítica Meta Ads (inversión, impresiones, clics, formularios, MTD) con Servidor MCP</div>
 
       <div class="kicker" style="margin-top:24px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.3 · YouTube Multi-Canal OAuth + Planning Comercial + MCP OAuth 2.1</td></tr>
-        <tr><td class="kv-key">Vigencia</td><td class="kv-val">Noviembre 2026</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.4 · Pestaña Estadísticas &amp; Meta Ads + Filtro Este Mes (MTD) + YouTube + MCP OAuth 2.1</td></tr>
+        <tr><td class="kv-key">Vigencia</td><td class="kv-val">27 de noviembre de 2026</td></tr>
         <tr><td class="kv-key">URL Servidor MCP</td><td class="kv-val"><code>https://www.ariascrm.com/mcp</code> (Streamable HTTP + PKCE S256)</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag <code>ai_content_studio_enabled</code>)</td></tr>
-        <tr><td class="kv-key">Relación operativa</td><td class="kv-val">Extiende Social Media Hub sin alterar <code>/marketing/social</code></td></tr>
+        <tr><td class="kv-key">Relación operativa</td><td class="kv-val">Extiende Social Media Hub y Reportes BI sin alterar conexiones actuales</td></tr>
       </table>
 
       <h3 class="sub-h">Responsables de control documental</h3>
@@ -206,7 +207,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
           <tr><th style="width:48%;">Función</th><th style="width:52%;">Responsable / estado</th></tr>
         </thead>
         <tbody>
-          <tr><td>Elaboración · UI Comercial, Servidor MCP, OAuth 2.1 y CRM</td><td>Implementado y verificado en producción</td></tr>
+          <tr><td>Elaboración · UI Comercial, Meta Ads, MCP, OAuth 2.1 y CRM</td><td>Implementado y verificado en producción</td></tr>
           <tr><td>Revisión · Dirección y Supervisión</td><td>Jimmy Arias (Super Admin · Arias Group)</td></tr>
           <tr><td>Uso operativo</td><td>Dirección, Equipo de Marketing (Patricia Morales) y Administración SaaS</td></tr>
         </tbody>
@@ -214,7 +215,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
       <p class="body-p" style="color:#475569;">Distribución prevista: Dirección, Marketing y Administración SaaS.</p>
     </div>
   </div>
-  ${ftr(1, 10)}
+  ${ftr(1, 11)}
 </section>
 
 <!-- PAGE 2: 01 / MARCO OPERATIVO -->
@@ -277,7 +278,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
     <p class="body-p"><strong>Resultado esperado:</strong> flujo completo desde la creación en ChatGPT hasta publicación o programación visual en Calendario por Horas, con vista previa real antes de publicar.</p>
     <p class="body-p"><strong>Aislamiento SaaS:</strong> cualquier empresa con <code>ai_content_studio_enabled = false</code> no visualiza el módulo ni puede autorizar ChatGPT (HTTP 403 en servidor).</p>
   </div>
-  ${ftr(2, 10)}
+  ${ftr(2, 11)}
 </section>
 
 <!-- PAGE 3: 02 / CONFIGURACIÓN -->
@@ -327,13 +328,23 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
           <td>Selección múltiple + Soft-delete</td>
           <td>Permite publicar o mover varios posts a Eliminados en lote, conservando auditoría de fecha/usuario y botón <em>Restaurar</em> en 1 clic.</td>
         </tr>
+        <tr>
+          <td><strong>Estadísticas &amp; Meta Ads</strong></td>
+          <td><code>meta-ads-insights</code> (solo lectura) + MTD</td>
+          <td>Conecta cuentas publicitarias (OAuth <code>ads_read</code> o Token Permanente) sin alterar <code>meta-oauth</code> ni aparecer en destinos de publicación. Cruza inversión, impresiones, clics, formularios (CPL), Leads CRM y Consumo OpenAI.</td>
+        </tr>
+        <tr>
+          <td><strong>Filtro Este Mes (MTD)</strong></td>
+          <td>Reportes BI (<code>/reports</code>)</td>
+          <td>Rango <code>Este Mes (MTD)</code> por defecto desde el día 1 del mes en embudo comercial y Card de Consumo OpenAI (IA).</td>
+        </tr>
       </tbody>
     </table>
 
     <h3 class="sub-h">Criterio multi-empresa y costo \$0 API</h3>
     <p class="body-p">La generación visual se ejecuta con el motor nativo de <strong>ChatGPT Plus (\$20/mes)</strong> conectado mediante <em>Plugins → Custom MCP server</em> (<code>https://www.ariascrm.com/mcp</code>), sin gasto adicional de API de imágenes y preservando intacto el módulo clásico <strong>Social Media Hub</strong> (<code>/marketing/social</code>).</p>
   </div>
-  ${ftr(3, 10)}
+  ${ftr(3, 11)}
 </section>
 
 <!-- PAGE 4: 03 / EJECUCIÓN -->
@@ -365,7 +376,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
     <div class="step-hdr"><span class="num">01 ·</span> Vincular todos los canales necesarios (Iclesia, Arias Defense o clientes SaaS)</div>
     <p class="body-p">En <strong>Planning → Conexiones</strong>, pulsar <strong>+ Conectar canal de YouTube</strong>, elegir la cuenta Google y seleccionar el canal (ej. <em>Iclesia</em>). Repetir 1 vez para agregar otro canal (ej. <em>Arias Defense Components</em>) sin configurar llaves ni APIs manuales.</p>
   </div>
-  ${ftr(4, 10)}
+  ${ftr(4, 11)}
 </section>
 
 <!-- PAGE 5: 04 / CONTROL OPERATIVO Y SUPERVISIÓN -->
@@ -439,12 +450,13 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.3 / Nov. 2026</td><td>Integración YouTube Multi-Canal (<code>youtube-oauth</code> + <code>publish-youtube</code>), selector de canales en 2 clics, vista previa YouTube en vivo y simplificación de acceso en Social Hub.</td><td>Vigente en producción</td></tr>
-        <tr><td>1.2 / Nov. 2026</td><td>Rediseño UX/UI comercial completo (Calendario por Horas, Mejores horarios, Vista Lista con acciones en lote y Compositor 2 columnas).</td><td>Superada por v1.3</td></tr>
+        <tr><td>1.4 / 27 Nov. 2026</td><td>Agrega pestaña <strong>Estadísticas &amp; Ads</strong> (inversión Meta Ads, impresiones, clics, formularios llenados, CPL y cruce CRM/IA), tarjeta activa Meta Ads aislada en Conexiones y filtro <strong>Este Mes (MTD)</strong> en <code>/reports</code>.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.3 / Nov. 2026</td><td>Integración YouTube Multi-Canal (<code>youtube-oauth</code> + <code>publish-youtube</code>), selector de canales en 2 clics, vista previa YouTube en vivo y simplificación de acceso en Social Hub.</td><td>Superada por v1.4</td></tr>
+        <tr><td>1.2 / Nov. 2026</td><td>Rediseño UX/UI comercial completo (Calendario por Horas, Mejores horarios, Vista Lista con acciones en lote y Compositor 2 columnas).</td><td>Versión base</td></tr>
       </tbody>
     </table>
   </div>
-  ${ftr(5, 10)}
+  ${ftr(5, 11)}
 </section>
 
 <!-- PAGE 6: 05 / PROCEDIMIENTO VISUAL (Calendario Horario + Lista) -->
@@ -480,7 +492,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 2. Tabla comercial con íconos oficiales por red, origen ChatGPT, indicador de estado y menú contextual.</div>
   </div>
-  ${ftr(6, 10)}
+  ${ftr(6, 11)}
 </section>
 
 <!-- PAGE 7: 06 / PROCEDIMIENTO VISUAL (Editor 2 Columnas + Conexiones) -->
@@ -504,18 +516,18 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 3. Modal de creación/edición en dos columnas con vista previa real para Facebook, Instagram y YouTube.</div>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">04 ·</span> Conectar Meta y múltiples canales YouTube en 2 clics</div>
-    <p class="body-p" style="margin-bottom:4px;">La pestaña <strong>Conexiones</strong> (o la ruta <code>/company/social-accounts</code>) permite vincular páginas Meta y cualquier canal YouTube (<em>Iclesia</em>, <em>Arias Defense</em>, clientes) en 2 clics.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">04 ·</span> Conectar Meta, YouTube y cuenta publicitaria Meta Ads (solo lectura)</div>
+    <p class="body-p" style="margin-bottom:4px;">En <strong>Conexiones</strong>, vincule sus páginas y canales YouTube en 2 clics, o conecte su cuenta publicitaria en <strong>Meta Ads (Aislado · Solo lectura)</strong> por OAuth <code>ads_read</code> o Token Permanente.</p>
     <div class="shot-frame compact">
-      <img src="${pConn}" alt="Grid Conexiones de 3 columnas con YouTube activo" />
-      <div class="callout-box" style="left:23.1%;top:30.2%;width:23.0%;height:37.4%;"><span class="callout-tag">1. Facebook (4 activas)</span></div>
-      <div class="callout-box" style="left:46.9%;top:30.2%;width:23.0%;height:23.0%;"><span class="callout-tag">2. Instagram (2 activas)</span></div>
-      <div class="callout-box" style="left:70.6%;top:30.2%;width:23.0%;height:14.5%;"><span class="callout-tag right">3. YouTube Multi-Canal activo</span></div>
-      <div class="callout-box" style="left:23.1%;top:68.8%;width:70.5%;height:24.4%;"><span class="callout-tag bottom">4. Próximas integraciones</span></div>
+      <img src="${pConn}" alt="Grid Conexiones con Facebook, Instagram, YouTube y Meta Ads activo" />
+      <div class="callout-box" style="left:22.8%;top:35.5%;width:23.6%;height:37.5%;"><span class="callout-tag">1. Facebook (4 activas)</span></div>
+      <div class="callout-box" style="left:47.0%;top:35.5%;width:23.4%;height:23.0%;"><span class="callout-tag">2. Instagram (2 activas)</span></div>
+      <div class="callout-box" style="left:70.8%;top:35.5%;width:23.8%;height:35.5%;"><span class="callout-tag right">3. YouTube (3 canales activos)</span></div>
+      <div class="callout-box" style="left:22.8%;top:74.0%;width:23.6%;height:12.2%;"><span class="callout-tag bottom">4. Meta Ads (Aislado · Solo lectura)</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 4. Panel de Conexiones con Facebook, Instagram y YouTube activos en 2 clics sin configuración técnica.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 4. Panel de Conexiones actualizado con Facebook, Instagram, YouTube Multi-Canal y tarjeta activa Meta Ads.</div>
   </div>
-  ${ftr(7, 10)}
+  ${ftr(7, 11)}
 </section>
 
 <!-- PAGE 8: 07 / PROCEDIMIENTO VISUAL (Eliminados + Modal ChatGPT MCP) -->
@@ -549,7 +561,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 6. Modal comercial del Conector ChatGPT Plus con enlace MCP único y control de permisos por integrante.</div>
   </div>
-  ${ftr(8, 10)}
+  ${ftr(8, 11)}
 </section>
 
 <!-- PAGE 9: 08 / PROCEDIMIENTO VISUAL (Configurar Plugin MCP y Autorizar OAuth en 1 clic) -->
@@ -584,7 +596,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 8. Pantalla oficial de consentimiento OAuth 2.1 garantizando aislamiento estricto multi-empresa.</div>
   </div>
-  ${ftr(9, 10)}
+  ${ftr(9, 11)}
 </section>
 
 <!-- PAGE 10: 09 / PROCEDIMIENTO VISUAL (Plugin Conectado, Prueba Real & Privacidad) -->
@@ -614,12 +626,45 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-C
       <div class="callout-box" style="left:43.0%;top:10.1%;width:27.8%;height:12.0%;"><span class="callout-tag">1. Invocar @Arias CRM Planning</span></div>
       <div class="callout-box" style="left:30.8%;top:33.2%;width:26.0%;height:37.0%;"><span class="callout-tag bottom">2. Respuesta en tiempo real del CRM</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:4px;">Figura 10. Consulta real ejecutada desde ChatGPT Plus devolviendo las páginas conectadas de Arias Defense.</div>
-
-    <div class="privacy-title" style="margin-top:4px;">Control de privacidad</div>
-    <p class="body-p" style="color:#475569;margin-bottom:0;">Las capturas fueron tomadas sin exponer credenciales ni chats personales. Los tokens OAuth, fotografías maestras y cuentas conectadas son de uso exclusivo del personal autorizado de Arias Defense Components LLC.</p>
+    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 10. Consulta real ejecutada desde ChatGPT Plus devolviendo las páginas conectadas de Arias Defense.</div>
   </div>
-  ${ftr(10, 10)}
+  ${ftr(10, 11)}
+</section>
+
+<!-- PAGE 11: 10 / PROCEDIMIENTO VISUAL (Estadísticas & Meta Ads + Reportes BI MTD) -->
+<section class="page">
+  <div>
+    <div class="top-rule" style="margin-bottom:10px;">
+      <span class="brand">ARIAS GROUP</span>
+      <span class="doc-code">SOP-COM-2026-04 | Uso interno</span>
+    </div>
+    <div class="kicker">10 / PROCEDIMIENTO VISUAL</div>
+    <h1 class="sec-h1" style="font-size:18.5px;">Estadísticas Meta Ads y Filtro Este Mes (MTD)</h1>
+    <p class="lead-p" style="margin-bottom:5px;">Monitoreo conjunto de inversión publicitaria, clics, formularios, embudo CRM y consumo OpenAI IA.</p>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Analizar inversión Meta Ads, formularios y leads CRM en Estadísticas &amp; Ads</div>
+    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads</strong>, elija el rango (<strong>Este Mes MTD</strong>, Hoy, 7d, 30d o personalizado) para revisar los 6 KPIs, evolución diaria y campañas.</p>
+    <div class="shot-frame compact" style="width:76%;">
+      <img src="${pAnalytics}" alt="Pestaña Estadísticas & Ads en Social Planning" />
+      <div class="callout-box" style="left:20.6%;top:19.6%;width:76.2%;height:11.4%;"><span class="callout-tag">1. Filtros de fecha (MTD / Rango) y Conectar Meta Ads</span></div>
+      <div class="callout-box" style="left:20.6%;top:47.0%;width:76.2%;height:16.0%;"><span class="callout-tag">2. 6 KPIs (Inversión, Impresiones, Clics, Formularios, CRM, IA)</span></div>
+      <div class="callout-box" style="left:20.6%;top:64.8%;width:76.2%;height:34.0%;"><span class="callout-tag right">3. Evolución diaria y Embudo Ads → CRM</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Pestaña Estadísticas &amp; Ads con filtro Este Mes (MTD) activo y cruce automático con Leads CRM e IA.</div>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">12 ·</span> Auditar desempeño mensual acumulado con Este Mes (MTD) en /reports</div>
+    <p class="body-p" style="margin-bottom:3px;">En <strong>Reportes BI → Gráficos e Insights</strong>, use <strong>Este Mes (MTD)</strong> para comparar leads, valor en pipeline, cierres ganados y consumo OpenAI desde el día 1 del mes.</p>
+    <div class="shot-frame compact" style="width:76%;">
+      <img src="${pReportsMtd}" alt="Reportes BI con filtro Este Mes MTD" />
+      <div class="callout-box" style="left:65.4%;top:20.8%;width:31.4%;height:4.8%;"><span class="callout-tag">1. Filtro Este Mes (MTD) por defecto</span></div>
+      <div class="callout-box" style="left:20.0%;top:41.2%;width:76.8%;height:24.0%;"><span class="callout-tag">2. Card Consumo Estimado OpenAI (MTD)</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:4px;">Figura 12. Reportes BI en modo Este Mes (MTD) mostrando totales del mes actual y consumo real de IA.</div>
+
+    <div class="privacy-title" style="margin-top:2px;">Control de privacidad</div>
+    <p class="body-p" style="color:#475569;margin-bottom:0;">Las capturas fueron tomadas sin exponer credenciales ni tokens publicitarios. Las métricas, tokens OAuth/Ads y cuentas conectadas son de uso exclusivo del personal autorizado de Arias Defense Components LLC.</p>
+  </div>
+  ${ftr(11, 11)}
 </section>
 
 </body>
@@ -639,4 +684,5 @@ execFileSync(
   ],
   { stdio: 'inherit' },
 );
+try { fs.unlinkSync(TMP_HTML); } catch {}
 console.log('PDF Planning generado:', OUT_PDF);
