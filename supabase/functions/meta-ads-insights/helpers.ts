@@ -31,6 +31,8 @@ export interface MetaAdsDailyPoint {
   meta_leads: number;
   crm_leads: number;
   cpl: number;
+  won_amount: number;
+  won_deals: number;
 }
 
 export interface MetaAdsCampaignPoint {
@@ -58,6 +60,85 @@ export interface MetaAdsSummary {
   cpc: number;
   cpm: number;
   cpl: number;
+}
+
+export interface MetaAdsRoiSummary {
+  ad_spend: number;
+  ai_cost: number;
+  total_investment: number;
+  won_revenue: number;
+  won_deals: number;
+  meta_won_revenue: number;
+  meta_won_deals: number;
+  net_profit: number;
+  roi_pct: number | null;
+  roas: number | null;
+  cac: number | null;
+  meta_net_profit: number;
+  meta_roi_pct: number | null;
+  meta_roas: number | null;
+}
+
+export function resolveWonDealAmount(lead: {
+  closing_amount?: number | string | null;
+  value?: number | string | null;
+}): number {
+  const rawClosing = lead?.closing_amount;
+  if (rawClosing !== null && rawClosing !== undefined && String(rawClosing).trim() !== '') {
+    const parsed = Number(rawClosing);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  const parsedVal = Number(lead?.value);
+  return Number.isFinite(parsedVal) ? parsedVal : 0;
+}
+
+export function computeRoiMetrics(input: {
+  adSpend: number;
+  aiCost: number;
+  wonRevenue: number;
+  wonDeals: number;
+  metaWonRevenue: number;
+  metaWonDeals: number;
+}): MetaAdsRoiSummary {
+  const adSpend = Number((Number(input.adSpend) || 0).toFixed(2));
+  const aiCost = Number((Number(input.aiCost) || 0).toFixed(4));
+  const totalInvestment = Number((adSpend + aiCost).toFixed(2));
+  const wonRevenue = Number((Number(input.wonRevenue) || 0).toFixed(2));
+  const wonDeals = Math.max(0, Math.round(Number(input.wonDeals) || 0));
+  const metaWonRevenue = Number((Number(input.metaWonRevenue) || 0).toFixed(2));
+  const metaWonDeals = Math.max(0, Math.round(Number(input.metaWonDeals) || 0));
+
+  const netProfit = Number((wonRevenue - totalInvestment).toFixed(2));
+  const roiPct =
+    totalInvestment > 0
+      ? Number((((wonRevenue - totalInvestment) / totalInvestment) * 100).toFixed(1))
+      : null;
+  const roas = adSpend > 0 ? Number((wonRevenue / adSpend).toFixed(2)) : null;
+  const cac = wonDeals > 0 ? Number((totalInvestment / wonDeals).toFixed(2)) : null;
+
+  const metaNetProfit = Number((metaWonRevenue - totalInvestment).toFixed(2));
+  const metaRoiPct =
+    totalInvestment > 0
+      ? Number((((metaWonRevenue - totalInvestment) / totalInvestment) * 100).toFixed(1))
+      : null;
+  const metaRoas = adSpend > 0 ? Number((metaWonRevenue / adSpend).toFixed(2)) : null;
+
+  return {
+    ad_spend: adSpend,
+    ai_cost: aiCost,
+    total_investment: totalInvestment,
+    won_revenue: wonRevenue,
+    won_deals: wonDeals,
+    meta_won_revenue: metaWonRevenue,
+    meta_won_deals: metaWonDeals,
+    net_profit: netProfit,
+    roi_pct: roiPct,
+    roas,
+    cac,
+    meta_net_profit: metaNetProfit,
+    meta_roi_pct: metaRoiPct,
+    meta_roas: metaRoas,
+  };
 }
 
 const DEFAULT_TZ = 'America/El_Salvador';
@@ -145,6 +226,8 @@ export function aggregateMetaInsights(
       meta_leads: 0,
       crm_leads: 0,
       cpl: 0,
+      won_amount: 0,
+      won_deals: 0,
     };
     prev.spend = Number((prev.spend + spend).toFixed(2));
     prev.impressions += impressions;

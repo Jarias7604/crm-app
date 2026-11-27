@@ -2,7 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   aggregateMetaInsights,
   computeDateRangePreset,
+  computeRoiMetrics,
   normalizeAdAccountId,
+  resolveWonDealAmount,
 } from './helpers.ts';
 
 const META_API_VERSION = 'v22.0';
@@ -308,7 +310,7 @@ Deno.serve(async (req: Request) => {
     const sinceTs = `${since}T00:00:00-06:00`;
     const untilTs = `${until}T23:59:59.999-06:00`;
 
-    const [{ data: crmLeads }, { data: aiLogs }, { data: adAccounts }] = await Promise.all([
+    const [{ data: crmLeads }, { data: aiLogs }, { data: adAccounts }, { data: wonLeads }] = await Promise.all([
       supabase
         .from('leads')
         .select('id, source, status, value, created_at, raw_meta_payload')
@@ -331,23 +333,72 @@ Deno.serve(async (req: Request) => {
         .eq('is_active', true)
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: true }),
+      supabase
+        .from('leads')
+        .select('id, name, company_name, source, status, value, closing_amount, internal_won_date, created_at, raw_meta_payload')
+        .eq('company_id', companyId)
+        .in('status', ['Cerrado', 'Cliente'])
+        .gte('internal_won_date', sinceTs)
+        .lte('internal_won_date', untilTs)
+        .order('internal_won_date', { ascending: false })
+        .limit(2000),
     ]);
 
     const crmLeadsByDay = new Map<string, number>();
     let totalCrmLeads = 0;
     let metaSheetLeads = 0;
-    let wonDeals = 0;
-    let wonAmount = 0;
 
     for (const l of crmLeads || []) {
       totalCrmLeads++;
       if (isMetaOrSheetsLead(l)) metaSheetLeads++;
-      if (l.status === 'Cliente' || l.status === 'Cerrado') {
-        wonDeals++;
-        wonAmount += Number(l.value) || 0;
-      }
       const dayKey = toSvYmd(l.created_at);
       if (dayKey) crmLeadsByDay.set(dayKey, (crmLeadsByDay.get(dayKey) || 0) + 1);
+    }
+
+    const wonAmountByDay = new Map<string, number>();
+    const wonDealsByDay = new Map<string, number>();
+    let wonDeals = 0;
+    let wonClosedCount = 0;
+    let wonClientCount = 0;
+    let wonAmount = 0;
+    let wonPotential = 0;
+    let wonMetaDeals = 0;
+    let wonMetaAmount = 0;
+    const wonItems: any[] = [];
+
+    for (const l of wonLeads || []) {
+      const dealAmount = resolveWonDealAmount(l);
+      const dealPotential = Number(l.value) || 0;
+      const isMetaSource = isMetaOrSheetsLead(l);
+      wonDeals++;
+      if (l.status === 'Cerrado') wonClosedCount++;
+      if (l.status === 'Cliente') wonClientCount++;
+      wonAmount += dealAmount;
+      wonPotential += dealPotential;
+      if (isMetaSource) {
+        wonMetaDeals++;
+        wonMetaAmount += dealAmount;
+      }
+
+      const wonDateKey = toSvYmd(l.internal_won_date || l.created_at);
+      if (wonDateKey) {
+        wonAmountByDay.set(wonDateKey, Number(((wonAmountByDay.get(wonDateKey) || 0) + dealAmount).toFixed(2)));
+        wonDealsByDay.set(wonDateKey, (wonDealsByDay.get(wonDateKey) || 0) + 1);
+      }
+
+      if (wonItems.length < 50) {
+        wonItems.push({
+          id: l.id,
+          name: l.name || 'Lead sin nombre',
+          company_name: l.company_name || null,
+          status: l.status,
+          source: l.source || 'Otros',
+          is_meta_source: isMetaSource,
+          amount: Number(dealAmount.toFixed(2)),
+          value: Number(dealPotential.toFixed(2)),
+          won_date: wonDateKey,
+        });
+      }
     }
 
     const aiCostUsd = Number(
@@ -357,7 +408,13 @@ Deno.serve(async (req: Request) => {
       total_leads: totalCrmLeads,
       meta_sheet_leads: metaSheetLeads,
       won_deals: wonDeals,
+      won_closed_count: wonClosedCount,
+      won_client_count: wonClientCount,
       won_amount: Number(wonAmount.toFixed(2)),
+      won_potential: Number(wonPotential.toFixed(2)),
+      won_meta_deals: wonMetaDeals,
+      won_meta_amount: Number(wonMetaAmount.toFixed(2)),
+      won_items: wonItems,
       ai_cost_usd: aiCostUsd,
       ai_calls: (aiLogs || []).length,
     };
@@ -372,8 +429,9 @@ Deno.serve(async (req: Request) => {
     }));
 
     if (!adAccounts || adAccounts.length === 0) {
-      const crmOnlyDaily = [...crmLeadsByDay.entries()]
-        .map(([date, crm_leads]) => ({
+      const crmOnlyDateSet = new Set<string>([...crmLeadsByDay.keys(), ...wonAmountByDay.keys()]);
+      const crmOnlyDaily = [...crmOnlyDateSet]
+        .map((date) => ({
           date,
           spend: 0,
           impressions: 0,
@@ -381,10 +439,21 @@ Deno.serve(async (req: Request) => {
           clicks: 0,
           link_clicks: 0,
           meta_leads: 0,
-          crm_leads,
+          crm_leads: crmLeadsByDay.get(date) || 0,
           cpl: 0,
+          won_amount: wonAmountByDay.get(date) || 0,
+          won_deals: wonDealsByDay.get(date) || 0,
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
+
+      const roi = computeRoiMetrics({
+        adSpend: 0,
+        aiCost: aiCostUsd,
+        wonRevenue: crmStats.won_amount,
+        wonDeals: crmStats.won_deals,
+        metaWonRevenue: crmStats.won_meta_amount,
+        metaWonDeals: crmStats.won_meta_deals,
+      });
 
       return json({
         ok: true,
@@ -408,6 +477,7 @@ Deno.serve(async (req: Request) => {
         daily: crmOnlyDaily,
         campaigns: [],
         crm: crmStats,
+        roi,
       });
     }
 
@@ -446,9 +516,9 @@ Deno.serve(async (req: Request) => {
       Array.isArray(campRes.data?.data) ? campRes.data.data : [],
     );
 
-    // Merge CRM leads per day into daily series
+    // Merge CRM leads and won deals per day into daily series
     const mergedByDate = new Map(agg.daily.map((d) => [d.date, { ...d }]));
-    for (const [date, count] of crmLeadsByDay.entries()) {
+    const ensureDay = (date: string) => {
       const existing = mergedByDate.get(date) || {
         date,
         spend: 0,
@@ -459,11 +529,31 @@ Deno.serve(async (req: Request) => {
         meta_leads: 0,
         crm_leads: 0,
         cpl: 0,
+        won_amount: 0,
+        won_deals: 0,
       };
-      existing.crm_leads = count;
       mergedByDate.set(date, existing);
+      return existing;
+    };
+    for (const [date, count] of crmLeadsByDay.entries()) {
+      ensureDay(date).crm_leads = count;
+    }
+    for (const [date, amt] of wonAmountByDay.entries()) {
+      ensureDay(date).won_amount = amt;
+    }
+    for (const [date, cnt] of wonDealsByDay.entries()) {
+      ensureDay(date).won_deals = cnt;
     }
     const mergedDaily = [...mergedByDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+    const roi = computeRoiMetrics({
+      adSpend: agg.summary.spend,
+      aiCost: aiCostUsd,
+      wonRevenue: crmStats.won_amount,
+      wonDeals: crmStats.won_deals,
+      metaWonRevenue: crmStats.won_meta_amount,
+      metaWonDeals: crmStats.won_meta_deals,
+    });
 
     return json({
       ok: true,
@@ -482,6 +572,7 @@ Deno.serve(async (req: Request) => {
       daily: mergedDaily,
       campaigns: agg.campaigns,
       crm: crmStats,
+      roi,
       ...(metaError ? { meta_error: metaError } : {}),
     });
   } catch (err: any) {

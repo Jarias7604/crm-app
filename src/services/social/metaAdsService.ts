@@ -12,6 +12,37 @@ export interface MetaAdsDailyPoint {
     meta_leads: number;
     crm_leads: number;
     cpl: number;
+    won_amount: number;
+    won_deals: number;
+}
+
+export interface MetaAdsWonDealItem {
+    id: string;
+    name: string;
+    company_name: string | null;
+    status: string;
+    source: string;
+    is_meta_source: boolean;
+    amount: number;
+    value: number;
+    won_date: string;
+}
+
+export interface MetaAdsRoiSummary {
+    ad_spend: number;
+    ai_cost: number;
+    total_investment: number;
+    won_revenue: number;
+    won_deals: number;
+    meta_won_revenue: number;
+    meta_won_deals: number;
+    net_profit: number;
+    roi_pct: number | null;
+    roas: number | null;
+    cac: number | null;
+    meta_net_profit: number;
+    meta_roi_pct: number | null;
+    meta_roas: number | null;
 }
 
 export interface MetaAdsCampaignPoint {
@@ -62,10 +93,17 @@ export interface MetaAdsInsightsResponse {
         total_leads: number;
         meta_sheet_leads: number;
         won_deals: number;
+        won_closed_count?: number;
+        won_client_count?: number;
         won_amount: number;
+        won_potential?: number;
+        won_meta_deals?: number;
+        won_meta_amount?: number;
+        won_items?: MetaAdsWonDealItem[];
         ai_cost_usd: number;
         ai_calls: number;
     };
+    roi?: MetaAdsRoiSummary;
     meta_error?: string | null;
     error?: string;
 }

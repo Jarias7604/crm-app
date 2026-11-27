@@ -917,7 +917,7 @@ export default function SocialPlanning() {
                                 title="Gestionar conexiones de redes"
                             >
                                 <div className="flex -space-x-1.5">
-                                    {accounts.slice(0, 3).map((acc) => (
+                                    {publishableAccounts.slice(0, 3).map((acc) => (
                                         <span
                                             key={acc.id}
                                             className="w-5 h-5 rounded-full ring-2 ring-white bg-white overflow-hidden flex items-center justify-center text-[9px] font-bold text-slate-700"
@@ -935,7 +935,7 @@ export default function SocialPlanning() {
                                     ))}
                                 </div>
                                 <span className="text-xs font-medium text-slate-700">
-                                    {accounts.length} {accounts.length === 1 ? 'red' : 'redes'}
+                                    {publishableAccounts.length} {publishableAccounts.length === 1 ? 'red' : 'redes'}
                                 </span>
                             </button>
 

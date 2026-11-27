@@ -745,6 +745,7 @@ export function SocialConnectionsGrid({
                                 </label>
                                 <input
                                     type="password"
+                                    autoComplete="new-password"
                                     value={adsTokenInput}
                                     onChange={(e) => setAdsTokenInput(e.target.value)}
                                     placeholder="EAAG..."
@@ -757,6 +758,7 @@ export function SocialConnectionsGrid({
                                 </label>
                                 <input
                                     type="text"
+                                    autoComplete="off"
                                     value={adsAccountIdInput}
                                     onChange={(e) => setAdsAccountIdInput(e.target.value)}
                                     placeholder="act_1234567890"

@@ -126,3 +126,54 @@ test('5. Edge Function meta-ads-insights/index.ts bundles cleanly without syntax
   assert.ok(fs.existsSync(outFile));
   assert.ok(fs.statSync(outFile).size > 2000);
 });
+
+test('6. resolveWonDealAmount and computeRoiMetrics match CRM Cerrado/Cliente ROI rules', () => {
+  assert.equal(mod.resolveWonDealAmount({ closing_amount: '450.50', value: '900' }), 450.5);
+  assert.equal(mod.resolveWonDealAmount({ closing_amount: 0, value: 900 }), 0);
+  assert.equal(mod.resolveWonDealAmount({ closing_amount: null, value: '320.25' }), 320.25);
+  assert.equal(mod.resolveWonDealAmount({ closing_amount: null, value: null }), 0);
+
+  // Profitable scenario (e.g. $450.65 ad spend + $0.0062 AI vs $994.85 CRM won)
+  const roiPos = mod.computeRoiMetrics({
+    adSpend: 450.65,
+    aiCost: 0.0062,
+    wonRevenue: 994.85,
+    wonDeals: 3,
+    metaWonRevenue: 774.5,
+    metaWonDeals: 2,
+  });
+  assert.equal(roiPos.total_investment, 450.66);
+  assert.equal(roiPos.net_profit, 544.19);
+  assert.equal(roiPos.roi_pct, 120.8);
+  assert.equal(roiPos.roas, 2.21);
+  assert.equal(roiPos.cac, 150.22);
+  assert.equal(roiPos.meta_net_profit, 323.84);
+  assert.equal(roiPos.meta_roi_pct, 71.9);
+  assert.equal(roiPos.meta_roas, 1.72);
+
+  // Negative ROI scenario
+  const roiNeg = mod.computeRoiMetrics({
+    adSpend: 500,
+    aiCost: 0,
+    wonRevenue: 200,
+    wonDeals: 1,
+    metaWonRevenue: 0,
+    metaWonDeals: 0,
+  });
+  assert.equal(roiNeg.net_profit, -300);
+  assert.equal(roiNeg.roi_pct, -60);
+  assert.equal(roiNeg.roas, 0.4);
+
+  // Zero spend & zero deals edge case
+  const roiZero = mod.computeRoiMetrics({
+    adSpend: 0,
+    aiCost: 0,
+    wonRevenue: 0,
+    wonDeals: 0,
+    metaWonRevenue: 0,
+    metaWonDeals: 0,
+  });
+  assert.equal(roiZero.roi_pct, null);
+  assert.equal(roiZero.roas, null);
+  assert.equal(roiZero.cac, null);
+});
