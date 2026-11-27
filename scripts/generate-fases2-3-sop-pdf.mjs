@@ -29,7 +29,7 @@ function loadShot(name) {
   return `data:image/png;base64,${fs.readFileSync(full).toString('base64')}`;
 }
 
-const m1 = loadShot('f23_01_control_maestro.png');
+const m1 = loadShot('f23_01_control_maestro_v14.png');
 const m2 = loadShot('f23_02_prompts_handoff.png');
 const m3 = loadShot('f23_03_playbooks_dolor.png');
 const m4 = loadShot('f23_04_enrutamiento_sla.png');
@@ -37,6 +37,7 @@ const m5 = loadShot('f23_05_cola_y_simulador.png');
 const m6 = loadShot('f23_06_chat_whatsapp_control.png');
 const mSyncLead = loadShot('sync_01_lead_erroneo.png');
 const mSyncChat = loadShot('sync_02_chat_erroneo.png');
+const mReportsCost = loadShot('f23_07_reportes_consumo_ia.png');
 
 const commonHead = (title) => `<!DOCTYPE html>
 <html lang="es">
@@ -201,7 +202,7 @@ const hdr = (code = 'SOP-COM-2026-03 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Gestión comercial / Versión 1.3 · Calificador IA (Turnos 2–6, Voz Whisper, Watchdog) y Sincronización</span>
+    <span>Gestión comercial / Versión 1.4 · Calificador IA (Agenda Inteligente, Prioridad Demos y Control Costos IA)</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -219,7 +220,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <div class="kicker" style="margin-top:22px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-03</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.3 · Fases 2 y 3 + Continuidad Turnos 2–6 (Watchdog/Voz Whisper) + Sincronización</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.4 · Agenda Google Inteligente por Asesor, Prioridad Demos y Control de Costos IA (USD)</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">27 de noviembre de 2026</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">SaaS Multi-Empresa (aislado de Soporte Técnico)</td></tr>
         <tr><td class="kv-key">Estado inicial seguro</td><td class="kv-val">Motor APAGADO (is_enabled = false) · Modo Borrador</td></tr>
@@ -239,7 +240,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <p class="body-p" style="color:#475569;">Distribución prevista: Comercial, Supervisión operativa y Administración SaaS.</p>
     </div>
   </div>
-  ${ftr(1, 10)}
+  ${ftr(1, 11)}
 </section>
 
 <!-- PAGE 2: 01 / MARCO OPERATIVO & FLOW -->
@@ -306,10 +307,11 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
         <tr><td><strong>Sin riesgo en chats actuales</strong></td><td>El webhook solo ejecuta el calificador cuando <code>ai_qualifier_active = true</code> y el hilo es <code>lead</code> o <code>por_clasificar</code> con <code>lead_id</code> vinculado. Grupos y clientes de soporte siguen intactos.</td></tr>
         <tr><td><strong>Continuidad Turnos 2–6 y Voz</strong></td><td>Atiende también mensajes recientes recuperados por Watchdog (&lt; 15 min), notas de voz transcritas con Whisper y autorespuestas de WhatsApp Business (timeout 22s + deduplicación <code>wa_message_id</code>).</td></tr>
         <tr><td><strong>Human Takeover automático</strong></td><td>Si un asesor contesta desde el CRM o desde el teléfono conectado, el bot se pausa al instante (<code>human_takeover</code>).</td></tr>
+        <tr><td><strong>Agenda Inteligente y Prioridad Demos</strong></td><td>Solo bloquean citas <code>meeting/demo</code> del asesor y su Google Calendar <code>primary</code> (sin invitaciones &quot;en la lupa&quot;, calendarios compartidos ni llamadas de seguimiento).</td></tr>
       </tbody>
     </table>
   </div>
-  ${ftr(2, 10)}
+  ${ftr(2, 11)}
 </section>
 
 <!-- PAGE 3: 02 / CONFIGURACIÓN -->
@@ -346,7 +348,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       </tbody>
     </table>
   </div>
-  ${ftr(3, 10)}
+  ${ftr(3, 11)}
 </section>
 
 <!-- PAGE 4: 03 / EJECUCIÓN Y ACTIVACIÓN GRADUAL -->
@@ -378,7 +380,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <li><strong>04.</strong> Si el asesor interviene manualmente en cualquier chat, la IA se pausa sola; solo reactivarla con <em>Reactivar IA aquí</em> si se requiere retomar calificación.</li>
     </ul>
   </div>
-  ${ftr(4, 10)}
+  ${ftr(4, 11)}
 </section>
 
 <!-- PAGE 5: 04 / PROCEDIMIENTO VISUAL (Control Maestro & Prompts) -->
@@ -392,16 +394,16 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     <h1 class="sec-h1" style="font-size:19px;">Control Maestro, horario 24/7 y Prompts</h1>
     <p class="lead-p" style="margin-bottom:8px;">Ubicación de interruptores principales y personalización de mensajes desde <code>/leads/calificador-ia</code>.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">01 ·</span> Abrir Calificador IA y configurar Modo Borrador / Automático y horario 24/7</div>
-    <p class="body-p" style="margin-bottom:4px;">En el menú lateral bajo <strong>Leads</strong>, abra <strong>Calificador IA</strong>. Ajuste el modo, las fuentes permitidas, la cobertura 24/7 y presione <strong>Guardar Cambios</strong>.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">01 ·</span> Abrir Calificador IA, revisar Consumo USD, Modo y Reglas Inteligentes de Agenda</div>
+    <p class="body-p" style="margin-bottom:4px;">En <strong>Leads → Calificador IA</strong>, monitoree arriba el <strong>Card de Consumo IA (USD)</strong>, ajuste el modo, las reglas de Google Calendar + Prioridad Demos y presione <strong>Guardar Cambios</strong>.</p>
     <div class="shot-frame compact">
-      <img src="${m1}" alt="Control Maestro Calificador IA" />
-      <div class="callout-box" style="left:2.2%;top:45.6%;width:14.8%;height:4.4%;"><span class="callout-tag">1. Acceso Sidebar</span></div>
-      <div class="callout-box" style="left:63.5%;top:14.0%;width:26.8%;height:10.6%;"><span class="callout-tag bottom">2. Motor IA y Guardar</span></div>
-      <div class="callout-box" style="left:22.8%;top:53.0%;width:34.4%;height:13.0%;"><span class="callout-tag">3. Borrador vs Automático</span></div>
-      <div class="callout-box" style="left:60.5%;top:53.0%;width:34.8%;height:22.0%;"><span class="callout-tag">4. Cobertura 24/7 y Horarios</span></div>
+      <img src="${m1}" alt="Control Maestro Calificador IA v1.4" />
+      <div class="callout-box" style="left:20.6%;top:10.6%;width:76.2%;height:12.2%;"><span class="callout-tag">1. Card Consumo IA (USD real)</span></div>
+      <div class="callout-box" style="left:65.8%;top:0.0%;width:10.4%;height:4.1%;"><span class="callout-tag bottom">2. Guardar Cambios</span></div>
+      <div class="callout-box" style="left:40.0%;top:41.0%;width:16.4%;height:11.8%;"><span class="callout-tag bottom right">3. Modo Automático 24/7</span></div>
+      <div class="callout-box" style="left:60.5%;top:71.5%;width:34.5%;height:22.8%;"><span class="callout-tag">4. Agenda Google + Prioridad Demos</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:6px;">Figura 1. Pestaña Control Maestro &amp; Horario 24/7 con interruptor de seguridad apagado de fábrica.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:6px;">Figura 1. Panel superior con consumo real en dólares (<code>ai_usage_logs</code>), modo de operación y reglas inteligentes de agenda por asesor.</div>
 
     <div class="step-hdr" style="margin-top:2px;"><span class="num">02 ·</span> Editar prompts, plantilla inicial y palabras clave de traspaso humano</div>
     <p class="body-p" style="margin-bottom:4px;">En <strong>Prompts y Traspaso Humano</strong>, adapte el saludo inicial con vista previa real de WhatsApp y configure las frases que transfieren al asesor.</p>
@@ -412,7 +414,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 2. Edición de prompts consultivos y respuestas diferenciadas en horario laboral vs nocturno (10:00 PM).</div>
   </div>
-  ${ftr(5, 10)}
+  ${ftr(5, 11)}
 </section>
 
 <!-- PAGE 6: 05 / PROCEDIMIENTO VISUAL (Playbooks & Enrutamiento) -->
@@ -445,7 +447,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 4. Reglas activas por producto, prueba directa al celular del asesor y respaldo SLA anti-fuga.</div>
   </div>
-  ${ftr(6, 10)}
+  ${ftr(6, 11)}
 </section>
 
 <!-- PAGE 7: 06 / PROCEDIMIENTO VISUAL (Cola Sheets, Borradores & Simulador) -->
@@ -475,7 +477,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <strong>Abrir ficha completa en CRM:</strong> <code>https://ariascrm.com/leads?lead=&lt;UUID&gt;</code>
     </div>
   </div>
-  ${ftr(7, 10)}
+  ${ftr(7, 11)}
 </section>
 
 <!-- PAGE 8: 07 / PROCEDIMIENTO VISUAL (Chat WhatsApp CRM) -->
@@ -498,7 +500,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     <h3 class="sub-h">Comportamiento ante intervención humana y continuidad garantizada (v1.3)</h3>
     <p class="body-p">Al hacer clic en <strong>Pausar IA aquí</strong> o enviar cualquier texto/archivo manual, el ticket cambia internamente a <code>human_takeover</code> o <code>paused</code>, protegiendo al cliente contra respuestas cruzadas entre el bot y el vendedor. Mientras la IA siga activa, procesa respuestas de texto, mensajes recientes rescatados por Watchdog (&lt; 15 min), saludos automáticos de WhatsApp Business y notas de voz transcritas por Whisper, registrando su última traza en <code>ai_qualifier_last_diag</code>.</p>
   </div>
-  ${ftr(8, 10)}
+  ${ftr(8, 11)}
 </section>
 
 <!-- PAGE 9: 08 / SINCRONIZACIÓN BIDIRECCIONAL CHAT <-> LEAD -->
@@ -529,14 +531,46 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 7b. Vista en <code>/support/chat</code> coincidiendo al 100% con Ficha Lead y con el bot detenido.</div>
   </div>
-  ${ftr(9, 10)}
+  ${ftr(9, 11)}
 </section>
 
-<!-- PAGE 10: 09 / SUPERVISIÓN & PRIVACIDAD -->
+<!-- PAGE 10: 09 / AGENDA INTELIGENTE Y CONTROL DE COSTOS IA -->
 <section class="page">
   <div>
     ${hdr()}
-    <div class="kicker">09 / SUPERVISIÓN Y CONTROL DE CAMBIOS</div>
+    <div class="kicker">09 / AGENDA INTELIGENTE Y CONTROL DE COSTOS IA</div>
+    <h1 class="sec-h1" style="font-size:19.5px;">Prioridad de Demos, Google Calendar y Costo OpenAI (USD)</h1>
+    <p class="lead-p" style="margin-bottom:8px;">Disponibilidad real por asesor sin bloquearse por invitaciones &quot;en la lupa&quot; ni llamadas secundarias, y monitoreo exacto de inversión IA.</p>
+
+    <table class="inst" style="margin-bottom:10px;">
+      <thead>
+        <tr><th style="width:28%;">Regla / módulo</th><th style="width:72%;">Comportamiento exacto en producción</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Prioridad Demos en CRM</strong></td><td>En <code>follow_ups</code> solo bloquean citas <code>meeting</code> / <code>demo</code> y reservas de <code>booking_appointments</code> del asesor asignado. Llamadas, WhatsApp, Emails y Cotizaciones NO bloquean Demos.</td></tr>
+        <tr><td><strong>Google Calendar por asesor</strong></td><td><code>fetch_primary_events</code> consulta estrictamente la integración Google del <code>advisorId</code> asignado y solo su calendario <code>primary</code> (nunca calendarios compartidos ni de otro colega).</td></tr>
+        <tr><td><strong>Filtro &quot;En la lupa&quot;</strong></td><td>Excluye invitaciones de terceros (ej. Patricia) sin confirmar (<code>needsAction</code>), opcionales (<code>optional: true</code>) o rechazadas, así como eventos marcados <em>Disponible</em> o de todo el día.</td></tr>
+        <tr><td><strong>Control de costos (<code>ai_usage_logs</code>)</strong></td><td>Registra tokens reales de <code>gpt-4o-mini</code> y segundos exactos de <code>whisper-1</code> (<code>verbose_json</code>) en USD, visible en <code>/leads/calificador-ia</code> y en Estadísticas BI (<code>/reports</code>).</td></tr>
+      </tbody>
+    </table>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">07 ·</span> Supervisar gasto OpenAI (USD), costo por lead y desglose en Reportes (/reports)</div>
+    <p class="body-p" style="margin-bottom:4px;">En el módulo <strong>Reports → Gráficos e Insights</strong>, filtre por <strong>Últimos 30 Días / 90 Días / Este Año</strong> para auditar gasto total, consumo del día, promedio por lead y desglose entre Calificador, Audios Whisper y Soporte IA.</p>
+    <div class="shot-frame" style="width:86%;margin:5px auto 3px auto;">
+      <img src="${mReportsCost}" alt="Consumo Estimado OpenAI en Estadísticas BI /reports" />
+      <div class="callout-box" style="left:73.2%;top:20.8%;width:23.6%;height:5.0%;"><span class="callout-tag">1. Rango de fechas (30d / 90d / Año)</span></div>
+      <div class="callout-box" style="left:20.0%;top:41.2%;width:76.8%;height:24.0%;"><span class="callout-tag">2. Tarjeta Consumo Estimado OpenAI (Mes / Hoy / Promedio Lead / Desglose)</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 8. Vista real de <code>/reports</code> mostrando métricas de embudo y el Card de Consumo Estimado OpenAI (USD) conectado a <code>ai_usage_logs</code>.</div>
+  </div>
+  ${ftr(10, 11)}
+</section>
+
+<!-- PAGE 11: 10 / SUPERVISIÓN & PRIVACIDAD -->
+<section class="page">
+  <div>
+    ${hdr()}
+    <div class="kicker">10 / SUPERVISIÓN Y CONTROL DE CAMBIOS</div>
     <h1 class="sec-h1">Lista de verificación, SLA y control documental</h1>
     <p class="lead-p">Auditoría semanal recomendada para gerencia y líderes comerciales.</p>
 
@@ -547,12 +581,13 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <tbody>
         <tr><td><strong>Integridad de borradores</strong></td><td>Sin leads retenidos en <code>draft_pending</code> más de 2 horas hábiles sin revisión.</td><td>[ ] Conforme &nbsp; [ ] Revisar</td></tr>
         <tr><td><strong>Cumplimiento SLA traspasos</strong></td><td>Ejecutivos atienden traspasos <code>handed_off</code> antes de disparar alerta de respaldo.</td><td>[ ] Conforme &nbsp; [ ] Revisar</td></tr>
-        <tr><td><strong>Disponibilidad Google Meet</strong></td><td>Integración Google Calendar activa emitiendo enlaces <code>meet_link</code> en <code>follow_ups</code>.</td><td>[ ] Conforme &nbsp; [ ] Revisar</td></tr>
+        <tr><td><strong>Agenda Google y Prioridad</strong></td><td>Google Calendar activo por asesor respetando prioridad Demos y excluyendo invitaciones sin aceptar.</td><td>[ ] Conforme &nbsp; [ ] Revisar</td></tr>
+        <tr><td><strong>Consumo OpenAI (USD)</strong></td><td>Validar gasto mensual en <code>/reports</code> y <code>/leads/calificador-ia</code> dentro del presupuesto configurado.</td><td>[ ] Conforme &nbsp; [ ] Revisar</td></tr>
         <tr><td><strong>Aislamiento de Soporte</strong></td><td>Confirmar 0 activaciones comerciales en grupos o tickets de clientes de soporte.</td><td>[ ] Conforme &nbsp; [ ] Revisar</td></tr>
       </tbody>
     </table>
 
-    <p class="body-p" style="color:#475569;margin-bottom:18px;">Registro de revisión: Fecha _______________ &nbsp;&nbsp;&nbsp; Responsable _____________________________</p>
+    <p class="body-p" style="color:#475569;margin-bottom:14px;">Registro de revisión: Fecha _______________ &nbsp;&nbsp;&nbsp; Responsable _____________________________</p>
 
     <h3 class="sub-h">Historial documental</h3>
     <table class="inst">
@@ -560,7 +595,8 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.3 / 27 Nov. 2026</td><td>Continuidad garantizada Turnos 2–6: soporte a mensajes recientes rescatados por Watchdog (&lt;15m), notas de voz vía Whisper, manejo de autorespuestas WhatsApp Business, timeout 22s, deduplicación por <code>wa_message_id</code> y traza <code>ai_qualifier_last_diag</code>.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.4 / 27 Nov. 2026</td><td>Agenda Google Calendar inteligente por asesor (<code>primary</code> + exclusión invitaciones &quot;en la lupa&quot; y compartidos), prioridad de Demos sobre llamadas/seguimientos y control real de costos OpenAI/Whisper (<code>ai_usage_logs</code>) en <code>/leads/calificador-ia</code> y <code>/reports</code>.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.3 / 27 Nov. 2026</td><td>Continuidad garantizada Turnos 2–6: soporte a mensajes recientes rescatados por Watchdog (&lt;15m), notas de voz vía Whisper, manejo de autorespuestas WhatsApp Business, timeout 22s, deduplicación por <code>wa_message_id</code> y traza <code>ai_qualifier_last_diag</code>.</td><td>Versión previa</td></tr>
         <tr><td>1.2 / Nov. 2026</td><td>Agrega sincronización bidireccional Chat WhatsApp ⇄ Lead Discovery (SSOT trigger PostgreSQL, marcado automático Erróneo y pausa automática IA) con capturas reales.</td><td>Versión previa</td></tr>
         <tr><td>1.1 / Nov. 2026</td><td>Incorpora Cola por Lote de Google Sheets (filtro Hoy/7d/Todos y botón Activar IA para Seleccionados) con captura real actualizada.</td><td>Versión previa</td></tr>
         <tr><td>1.0 / Nov. 2026</td><td>SOP oficial Fases 2 y 3 con capturas reales del entorno CRM y trazabilidad visual.</td><td>Versión base</td></tr>
@@ -570,7 +606,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     <div class="privacy-title">Control de privacidad</div>
     <p class="body-p" style="color:#475569;">Las capturas incorporadas son evidencia ilustrativa generada con datos demostrativos sanitizados. No se deben distribuir hojas ni registros reales de prospectos fuera de los canales autorizados de Arias Group.</p>
   </div>
-  ${ftr(10, 10)}
+  ${ftr(11, 11)}
 </section>
 
 </body>
