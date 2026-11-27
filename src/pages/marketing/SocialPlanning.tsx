@@ -50,8 +50,9 @@ import {
     SocialNetworkBadge,
 } from '../../components/social/SocialBrandKit';
 import { PostLivePreview } from '../../components/social/PostLivePreview';
+import { PlanningAnalyticsTab } from '../../components/social/PlanningAnalyticsTab';
 
-type PlanningTab = 'calendar' | 'list' | 'deleted' | 'connections';
+type PlanningTab = 'calendar' | 'list' | 'deleted' | 'analytics' | 'connections';
 type CalendarMode = 'hourly' | 'cards';
 
 const STATUS_META: Record<string, { label: string; dot: string; borderLeft: string; pillCls: string }> = {
@@ -171,7 +172,10 @@ export default function SocialPlanning() {
 
     const initialTabParam = searchParams.get('tab');
     const [activeTab, setActiveTab] = useState<PlanningTab>(
-        initialTabParam === 'list' || initialTabParam === 'deleted' || initialTabParam === 'connections'
+        initialTabParam === 'list' ||
+            initialTabParam === 'deleted' ||
+            initialTabParam === 'analytics' ||
+            initialTabParam === 'connections'
             ? initialTabParam
             : 'calendar',
     );
@@ -181,7 +185,13 @@ export default function SocialPlanning() {
 
     useEffect(() => {
         const tabParam = searchParams.get('tab');
-        if (tabParam === 'connections' || tabParam === 'list' || tabParam === 'deleted' || tabParam === 'calendar') {
+        if (
+            tabParam === 'connections' ||
+            tabParam === 'list' ||
+            tabParam === 'deleted' ||
+            tabParam === 'analytics' ||
+            tabParam === 'calendar'
+        ) {
             setActiveTab(tabParam);
             setSearchParams({}, { replace: true });
         }
@@ -194,6 +204,14 @@ export default function SocialPlanning() {
     const [posts, setPosts] = useState<PlanningSocialPost[]>([]);
     const [deletedPosts, setDeletedPosts] = useState<PlanningSocialPost[]>([]);
     const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+    const publishableAccounts = useMemo(
+        () => accounts.filter((a) => a.platform !== 'meta_ads'),
+        [accounts],
+    );
+    const metaAdsAccounts = useMemo(
+        () => accounts.filter((a) => a.platform === 'meta_ads'),
+        [accounts],
+    );
 
     // Live clock display for El Salvador (-06:00)
     const [nowClock, setNowClock] = useState(() => new Date());
@@ -424,7 +442,7 @@ export default function SocialPlanning() {
         } else {
             setFormScheduledLocal(toDatetimeLocalValue());
         }
-        const defaultTargets = accounts
+        const defaultTargets = publishableAccounts
             .filter((a) => a.is_default && a.account_id)
             .map((a) => ({
                 platform: a.platform,
@@ -434,12 +452,12 @@ export default function SocialPlanning() {
         setFormSelectedAccounts(
             defaultTargets.length > 0
                 ? defaultTargets
-                : accounts[0]?.account_id
+                : publishableAccounts[0]?.account_id
                 ? [
                       {
-                          platform: accounts[0].platform,
-                          account_id: accounts[0].account_id,
-                          account_name: accounts[0].display_name || accounts[0].account_name,
+                          platform: publishableAccounts[0].platform,
+                          account_id: publishableAccounts[0].account_id,
+                          account_name: publishableAccounts[0].display_name || publishableAccounts[0].account_name,
                       },
                   ]
                 : [],
@@ -853,6 +871,7 @@ export default function SocialPlanning() {
                                 { id: 'calendar' as PlanningTab, label: 'Calendario', count: null },
                                 { id: 'list' as PlanningTab, label: 'Lista', count: posts.length },
                                 { id: 'deleted' as PlanningTab, label: 'Eliminados', count: deletedPosts.length },
+                                { id: 'analytics' as PlanningTab, label: 'Estadísticas & Ads', count: null },
                                 { id: 'connections' as PlanningTab, label: 'Conexiones', count: accounts.length },
                             ].map((t) => {
                                 const isActive = activeTab === t.id;
@@ -1795,7 +1814,16 @@ export default function SocialPlanning() {
                     </div>
                 )}
 
-                {/* TAB 4: CONNECTIONS (INLINE METRICOOL-GRADE GRID) */}
+                {/* TAB 4: ANALYTICS & META ADS */}
+                {activeTab === 'analytics' && (
+                    <PlanningAnalyticsTab
+                        companyId={companyId}
+                        metaAdsAccounts={metaAdsAccounts}
+                        onOpenConnect={() => setActiveTab('connections')}
+                    />
+                )}
+
+                {/* TAB 5: CONNECTIONS (INLINE METRICOOL-GRADE GRID) */}
                 {activeTab === 'connections' && (
                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-2xs">
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
@@ -1871,7 +1899,7 @@ export default function SocialPlanning() {
                                         </button>
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {accounts.map((acc) => {
+                                        {publishableAccounts.map((acc) => {
                                             const selected = formSelectedAccounts.some(
                                                 (t) =>
                                                     t.platform === acc.platform &&

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
+import { metaAdsService } from '../../services/social/metaAdsService';
 
 /**
  * MetaCallback — handles OAuth redirect from Facebook/Meta
@@ -45,16 +46,31 @@ export default function MetaCallback() {
   }, [searchParams, profile?.company_id]);
 
   async function exchangeCode(code: string) {
+    const rawState = decodeURIComponent(searchParams.get('state') || '');
+    const isMetaAdsFlow = rawState.startsWith('meta_ads:');
+    const targetCompanyId = isMetaAdsFlow
+      ? rawState.replace('meta_ads:', '').trim() || profile!.company_id!
+      : profile!.company_id!;
+
     try {
-      setMessage('Intercambiando código por tokens seguros...');
+      setMessage(isMetaAdsFlow ? 'Conectando cuentas publicitarias Meta Ads...' : 'Intercambiando código por tokens seguros...');
       const cleanOrigin = window.location.origin.replace('://www.', '://');
       const redirectUri = `${cleanOrigin}/integrations/meta/callback`;
+
+      if (isMetaAdsFlow) {
+        const adsRes = await metaAdsService.exchangeOAuth(targetCompanyId, code, redirectUri);
+        setAccountsFound(adsRes.connected || 0);
+        setStatus('success');
+        setMessage(`¡Meta Ads conectado! Se vincularon ${adsRes.connected} cuenta(s) publicitaria(s) en modo solo lectura.`);
+        setTimeout(() => navigate('/marketing/planning?tab=analytics'), 2200);
+        return;
+      }
 
       const { data, error } = await supabase.functions.invoke('meta-oauth', {
         body: {
           code,
           redirect_uri: redirectUri,
-          company_id: profile!.company_id,
+          company_id: targetCompanyId,
         }
       });
 
@@ -68,7 +84,7 @@ export default function MetaCallback() {
     } catch (err: any) {
       setStatus('error');
       setMessage(err.message || 'Error al conectar con Meta');
-      setTimeout(() => navigate('/company/social-accounts'), 3500);
+      setTimeout(() => navigate(isMetaAdsFlow ? '/marketing/planning?tab=connections' : '/company/social-accounts'), 3500);
     }
   }
 

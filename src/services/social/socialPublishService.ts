@@ -4,7 +4,7 @@ import { simGuard } from '../simGuard';
 export interface SocialAccount {
     id: string;
     company_id: string;
-    platform: 'facebook' | 'instagram' | 'tiktok' | 'youtube';
+    platform: 'facebook' | 'instagram' | 'tiktok' | 'youtube' | 'meta_ads';
     account_name: string | null;
     display_name: string | null;
     account_id: string | null;

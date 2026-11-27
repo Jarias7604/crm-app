@@ -46,10 +46,11 @@ export default function Reports() {
     const [dateRange, setDateRange] = useState('30d');
 
     // BI State
-    const [biDateRange, setBiDateRange] = useState<'30d' | '90d' | 'this_year'>('30d');
+    const [biDateRange, setBiDateRange] = useState<'mtd' | '30d' | '90d' | 'this_year'>('mtd');
     
     const startDate = useMemo(() => {
         const now = new Date();
+        if (biDateRange === 'mtd') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         if (biDateRange === '30d') return subMonths(now, 1).toISOString();
         if (biDateRange === '90d') return subMonths(now, 3).toISOString();
         return new Date(now.getFullYear(), 0, 1).toISOString();
@@ -472,7 +473,7 @@ export default function Reports() {
                     {/* BI Controls */}
                     <div className="flex justify-end mb-2">
                         <div className="flex bg-white rounded-xl shadow-sm border border-gray-100 p-1">
-                            {(['30d', '90d', 'this_year'] as const).map(range => (
+                            {(['mtd', '30d', '90d', 'this_year'] as const).map(range => (
                                 <button
                                     key={range}
                                     onClick={() => setBiDateRange(range)}
@@ -480,7 +481,7 @@ export default function Reports() {
                                         biDateRange === range ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'
                                     }`}
                                 >
-                                    {range === '30d' ? 'Últimos 30 Días' : range === '90d' ? 'Últimos 90 Días' : 'Este Año'}
+                                    {range === 'mtd' ? 'Este Mes (MTD)' : range === '30d' ? 'Últimos 30 Días' : range === '90d' ? 'Últimos 90 Días' : 'Este Año'}
                                 </button>
                             ))}
                         </div>
@@ -522,7 +523,9 @@ export default function Reports() {
                                 companyId={activeCompanyId}
                                 startDate={startDate}
                                 periodLabel={
-                                    biDateRange === '30d'
+                                    biDateRange === 'mtd'
+                                        ? 'Este Mes (MTD)'
+                                        : biDateRange === '30d'
                                         ? 'Últimos 30 Días'
                                         : biDateRange === '90d'
                                         ? 'Últimos 90 Días'

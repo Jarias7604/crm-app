@@ -1,7 +1,8 @@
-import React from 'react';
-import { Loader2, Plus, RefreshCw, Star, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Key, Loader2, Plus, RefreshCw, ShieldCheck, Star, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
+import { metaAdsService } from '../../services/social/metaAdsService';
 import type { SocialAccount } from '../../services/social/socialPublishService';
 
 const YOUTUBE_SCOPES = [
@@ -59,6 +60,23 @@ export function initiateMetaOAuth(companyId: string) {
         `?client_id=${META_APP_ID}`,
         `&redirect_uri=${encodeURIComponent(redirectUri)}`,
         `&scope=${encodeURIComponent(META_SCOPES)}`,
+        '&response_type=code',
+        `&state=${state}`,
+    ].join('');
+    window.location.href = url;
+}
+
+export const META_ADS_SCOPES = ['ads_read', 'business_management'].join(',');
+
+export function initiateMetaAdsOAuth(companyId: string) {
+    const cleanOrigin = window.location.origin.replace('://www.', '://');
+    const redirectUri = `${cleanOrigin}/integrations/meta/callback`;
+    const state = encodeURIComponent(`meta_ads:${companyId}`);
+    const url = [
+        'https://www.facebook.com/v22.0/dialog/oauth',
+        `?client_id=${META_APP_ID}`,
+        `&redirect_uri=${encodeURIComponent(redirectUri)}`,
+        `&scope=${encodeURIComponent(META_ADS_SCOPES)}`,
         '&response_type=code',
         `&state=${state}`,
     ].join('');
@@ -325,13 +343,6 @@ const ROADMAP_NETWORKS: FutureNetworkCard[] = [
         subtitle: 'Publicaciones & hilos · Próximamente',
         btnClass: 'bg-slate-900/90 hover:bg-slate-900 text-white',
     },
-    {
-        key: 'meta_ads',
-        label: 'Meta Ads',
-        cta: 'Conectar cuenta publicitaria',
-        subtitle: 'Métricas de campañas · Próximamente',
-        btnClass: 'bg-[#0081FB]/90 hover:bg-[#0081FB] text-white',
-    },
 ];
 
 export function SocialConnectionsGrid({
@@ -346,6 +357,12 @@ export function SocialConnectionsGrid({
     const fbAccounts = accounts.filter((a) => a.platform === 'facebook');
     const igAccounts = accounts.filter((a) => a.platform === 'instagram');
     const ytAccounts = accounts.filter((a) => a.platform === 'youtube');
+    const metaAdsAccounts = accounts.filter((a) => a.platform === 'meta_ads');
+
+    const [showMetaAdsModal, setShowMetaAdsModal] = useState(false);
+    const [adsTokenInput, setAdsTokenInput] = useState('');
+    const [adsAccountIdInput, setAdsAccountIdInput] = useState('');
+    const [connectingAds, setConnectingAds] = useState(false);
 
     const handleConnectMeta = () => {
         if (!companyId) {
@@ -361,6 +378,32 @@ export function SocialConnectionsGrid({
             return;
         }
         initiateYouTubeOAuth(companyId);
+    };
+
+    const handleConnectMetaAdsToken = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!companyId) return;
+        if (!adsTokenInput.trim()) {
+            toast.error('Pega tu token de acceso de Meta Ads (solo lectura).');
+            return;
+        }
+        setConnectingAds(true);
+        try {
+            const res = await metaAdsService.connectWithToken(
+                companyId,
+                adsTokenInput.trim(),
+                adsAccountIdInput.trim() || undefined,
+            );
+            toast.success(`Meta Ads conectado (${res.connected} cuenta publicitaria)`);
+            setAdsTokenInput('');
+            setAdsAccountIdInput('');
+            setShowMetaAdsModal(false);
+            await onRefresh?.();
+        } catch (err: any) {
+            toast.error(err?.message || 'No se pudo conectar Meta Ads');
+        } finally {
+            setConnectingAds(false);
+        }
     };
 
     const renderActiveSection = (
@@ -528,6 +571,98 @@ export function SocialConnectionsGrid({
                     '2 clics: elige tu cuenta Google y selecciona tu canal (Iclesia, Arias Defense, etc.).',
                 )}
 
+                <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            {renderPlatformIcon('meta_ads', 'w-5 h-5')}
+                            <span className="text-[13px] font-semibold text-slate-900">Meta Ads</span>
+                            {metaAdsAccounts.length > 0 && (
+                                <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                                    {metaAdsAccounts.length} {metaAdsAccounts.length === 1 ? 'activa' : 'activas'}
+                                </span>
+                            )}
+                        </div>
+                        <span className="text-[10px] font-semibold text-[#0081FB] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                            Aislado · Solo lectura
+                        </span>
+                    </div>
+
+                    <div className="space-y-2">
+                        {metaAdsAccounts.map((acc) => (
+                            <div
+                                key={acc.id}
+                                className="group flex items-center justify-between gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-2xs hover:border-slate-300 transition"
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <AccountAvatarWithBadge account={acc} size="md" />
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                                Cuenta Publicitaria
+                                            </span>
+                                            {acc.is_default && (
+                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 rounded">
+                                                    <Star className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                                                    Principal
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-[13px] font-semibold text-slate-900 truncate">
+                                            {acc.display_name || acc.account_name}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400">
+                                            {acc.account_id} · {acc.metadata?.currency || 'USD'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                    {onSetDefault && !acc.is_default && (
+                                        <button
+                                            type="button"
+                                            disabled={settingDefaultId === acc.id}
+                                            onClick={() => onSetDefault(acc)}
+                                            title="Marcar como cuenta principal"
+                                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition"
+                                        >
+                                            {settingDefaultId === acc.id ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <Star className="w-3.5 h-3.5" />
+                                            )}
+                                        </button>
+                                    )}
+                                    {onDisconnect && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onDisconnect(acc)}
+                                            title={`Desconectar ${acc.account_name || 'Meta Ads'}`}
+                                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+
+                        <button
+                            type="button"
+                            onClick={() => setShowMetaAdsModal(true)}
+                            className="w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold flex items-center justify-between shadow-2xs transition cursor-pointer bg-[#0081FB] hover:bg-[#006FE0] text-white"
+                        >
+                            <span className="truncate flex items-center gap-1.5">
+                                <Plus className="w-3.5 h-3.5 shrink-0" />
+                                {metaAdsAccounts.length > 0 ? 'Conectar otra cuenta Meta Ads' : 'Conectar cuenta publicitaria'}
+                            </span>
+                            {renderPlatformIcon('meta_ads', 'w-4 h-4 shrink-0 ring-1 ring-white/40 rounded-full')}
+                        </button>
+                        <p className="text-[11px] text-slate-400 px-0.5">
+                            Lee inversión ($), impresiones, clics y formularios para Estadísticas &amp; Ads sin afectar tus páginas.
+                        </p>
+                    </div>
+                </div>
+
                 {ROADMAP_NETWORKS.map((net) => (
                     <div key={net.key} className="space-y-2.5">
                         <div className="flex items-center justify-between">
@@ -556,6 +691,99 @@ export function SocialConnectionsGrid({
                     </div>
                 ))}
             </div>
+
+            {showMetaAdsModal && (
+                <div className="fixed inset-0 z-[60] bg-slate-900/55 backdrop-blur-xs flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl p-6 space-y-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <MetaAdsIcon className="w-7 h-7 shrink-0" />
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900">Conectar Meta Ads (Solo lectura)</h3>
+                                    <p className="text-xs text-slate-500">
+                                        Trae inversión, impresiones, clics y formularios sin tocar tus páginas actuales.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowMetaAdsModal(false)}
+                                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3.5 space-y-2">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                                <ShieldCheck className="w-4 h-4 text-[#0081FB]" />
+                                Opción 1 · Conexión rápida 1 clic (Facebook OAuth)
+                            </div>
+                            <p className="text-[11px] text-slate-600">
+                                Solicita únicamente permiso <code>ads_read</code> y <code>business_management</code> para leer tus cuentas publicitarias.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => companyId && initiateMetaAdsOAuth(companyId)}
+                                className="w-full py-2 px-3 rounded-lg bg-[#0081FB] hover:bg-[#006FE0] text-white text-xs font-semibold transition cursor-pointer"
+                            >
+                                Conectar con Facebook Ads (OAuth)
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleConnectMetaAdsToken} className="space-y-3 pt-1 border-t border-slate-100">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                                <Key className="w-3.5 h-3.5 text-slate-700" />
+                                Opción 2 · Token Permanente (Business Manager — Recomendado)
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                                Pega el token de Usuario del Sistema con permiso <code>ads_read</code>. No caduca ni depende de revisión de app.
+                            </p>
+                            <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                    Access Token de Meta Ads *
+                                </label>
+                                <input
+                                    type="password"
+                                    value={adsTokenInput}
+                                    onChange={(e) => setAdsTokenInput(e.target.value)}
+                                    placeholder="EAAG..."
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-[#0081FB]"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                    ID Cuenta Publicitaria (opcional — se auto-detecta)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={adsAccountIdInput}
+                                    onChange={(e) => setAdsAccountIdInput(e.target.value)}
+                                    placeholder="act_1234567890"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-[#0081FB]"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMetaAdsModal(false)}
+                                    className="px-3.5 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={connectingAds}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold disabled:opacity-60 cursor-pointer"
+                                >
+                                    {connectingAds && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                    Verificar y Conectar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
