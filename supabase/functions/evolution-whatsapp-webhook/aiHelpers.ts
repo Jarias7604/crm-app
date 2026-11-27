@@ -182,7 +182,84 @@ export function aiBotLabel(ch: SupportChannelType): string {
   return '🤖 IA Soporte';
 }
 
-export async function askOpenAiTechnicalClassifier(openAiKey: string, text: string): Promise<boolean> {
+export interface WebhookAiUsageCtx {
+  supabase: any;
+  companyId: string;
+  leadId?: string | null;
+  ticketId?: string | null;
+}
+
+export function calculateWebhookOpenAiCostUsd(input: {
+  model: string;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  audioSeconds?: number | null;
+}): number {
+  const model = String(input.model || '').toLowerCase().trim();
+  const promptTokens = Math.max(0, Number(input.promptTokens) || 0);
+  const completionTokens = Math.max(0, Number(input.completionTokens) || 0);
+  const audioSeconds = Math.max(0, Number(input.audioSeconds) || 0);
+  let cost = 0;
+  if (model.includes('whisper')) {
+    cost = (audioSeconds / 60) * 0.006;
+  } else if (model.includes('mini')) {
+    cost = (promptTokens * 0.15) / 1_000_000 + (completionTokens * 0.60) / 1_000_000;
+  } else if (model.includes('gpt-4o')) {
+    cost = (promptTokens * 2.50) / 1_000_000 + (completionTokens * 10.0) / 1_000_000;
+  } else {
+    cost = (promptTokens * 0.15) / 1_000_000 + (completionTokens * 0.60) / 1_000_000;
+  }
+  return Number(cost.toFixed(6));
+}
+
+export function estimateWebhookAudioDurationSeconds(byteLength: number): number {
+  return Math.max(1, Math.round(Math.max(0, Number(byteLength) || 0) / 3000));
+}
+
+async function logWebhookAiUsage(
+  usageCtx: WebhookAiUsageCtx | undefined,
+  entry: {
+    feature: string;
+    model: string;
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    audioSeconds?: number;
+    metadata?: Record<string, any>;
+  },
+) {
+  if (!usageCtx?.supabase || !usageCtx?.companyId) return;
+  try {
+    const estimatedCostUsd = calculateWebhookOpenAiCostUsd({
+      model: entry.model,
+      promptTokens: entry.promptTokens,
+      completionTokens: entry.completionTokens,
+      audioSeconds: entry.audioSeconds,
+    });
+    await usageCtx.supabase.from('ai_usage_logs').insert({
+      company_id: usageCtx.companyId,
+      feature: entry.feature,
+      provider: 'openai',
+      model: entry.model,
+      prompt_tokens: entry.promptTokens || 0,
+      completion_tokens: entry.completionTokens || 0,
+      total_tokens: entry.totalTokens || (entry.promptTokens || 0) + (entry.completionTokens || 0),
+      audio_seconds: entry.audioSeconds || 0,
+      estimated_cost_usd: estimatedCostUsd,
+      lead_id: usageCtx.leadId || null,
+      ticket_id: usageCtx.ticketId || null,
+      metadata: entry.metadata || {},
+    });
+  } catch (e) {
+    console.warn('[wa] logWebhookAiUsage warn:', (e as any)?.message || e);
+  }
+}
+
+export async function askOpenAiTechnicalClassifier(
+  openAiKey: string,
+  text: string,
+  usageCtx?: WebhookAiUsageCtx,
+): Promise<boolean> {
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -203,6 +280,15 @@ export async function askOpenAiTechnicalClassifier(openAiKey: string, text: stri
     });
     if (!res.ok) return false;
     const j = await res.json();
+    if (j?.usage) {
+      await logWebhookAiUsage(usageCtx, {
+        feature: 'support_ai_classifier',
+        model: 'gpt-4o-mini',
+        promptTokens: Number(j.usage.prompt_tokens) || 0,
+        completionTokens: Number(j.usage.completion_tokens) || 0,
+        totalTokens: Number(j.usage.total_tokens) || 0,
+      });
+    }
     const raw = String(j?.choices?.[0]?.message?.content || '').trim();
     try {
       const parsed = JSON.parse(raw);
@@ -216,7 +302,12 @@ export async function askOpenAiTechnicalClassifier(openAiKey: string, text: stri
   }
 }
 
-export async function askOpenAi(openAiKey: string, systemPrompt: string, userContent: string): Promise<string> {
+export async function askOpenAi(
+  openAiKey: string,
+  systemPrompt: string,
+  userContent: string,
+  usageCtx?: WebhookAiUsageCtx,
+): Promise<string> {
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -232,6 +323,15 @@ export async function askOpenAi(openAiKey: string, systemPrompt: string, userCon
     });
     if (!res.ok) return '';
     const j = await res.json();
+    if (j?.usage) {
+      await logWebhookAiUsage(usageCtx, {
+        feature: 'support_ai_reply',
+        model: 'gpt-4o-mini',
+        promptTokens: Number(j.usage.prompt_tokens) || 0,
+        completionTokens: Number(j.usage.completion_tokens) || 0,
+        totalTokens: Number(j.usage.total_tokens) || 0,
+      });
+    }
     return String(j?.choices?.[0]?.message?.content || '').trim();
   } catch (e) {
     console.error('[wa] OpenAI error', e);
@@ -239,12 +339,18 @@ export async function askOpenAi(openAiKey: string, systemPrompt: string, userCon
   }
 }
 
-export async function transcribeAudio(openAiKey: string, bytes: Uint8Array, mime: string): Promise<string> {
+export async function transcribeAudio(
+  openAiKey: string,
+  bytes: Uint8Array,
+  mime: string,
+  usageCtx?: WebhookAiUsageCtx,
+): Promise<string> {
   try {
     const form = new FormData();
     form.append('file', new Blob([bytes], { type: mime || 'audio/ogg' }), 'voice.ogg');
     form.append('model', 'whisper-1');
     form.append('language', 'es');
+    form.append('response_format', 'verbose_json');
     const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${openAiKey}` },
@@ -252,6 +358,13 @@ export async function transcribeAudio(openAiKey: string, bytes: Uint8Array, mime
     });
     if (!res.ok) return '';
     const j = await res.json();
+    const durationSec = Number(j?.duration) > 0 ? Number(j.duration) : estimateWebhookAudioDurationSeconds(bytes.length);
+    await logWebhookAiUsage(usageCtx, {
+      feature: 'whisper_audio',
+      model: 'whisper-1',
+      audioSeconds: durationSec,
+      metadata: { mime: mime || 'audio/ogg', bytes: bytes.length },
+    });
     return String(j?.text || '').trim();
   } catch (e) {
     console.error('[wa] Whisper error', e);

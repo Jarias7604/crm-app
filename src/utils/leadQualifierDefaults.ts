@@ -56,6 +56,9 @@ export interface LeadQualifierConfig {
     sla_escalation_minutes: number;
     sla_backup_user_id: string | null;
     crm_base_url: string;
+    sync_google_calendar_busy: boolean;
+    ignore_unaccepted_calendar_invites: boolean;
+    ai_monthly_budget_usd: number;
 }
 
 export interface LeadQualifierSession {
@@ -126,5 +129,8 @@ export function buildDefaultQualifierConfig(companyId: string): LeadQualifierCon
         sla_escalation_minutes: 15,
         sla_backup_user_id: null,
         crm_base_url: 'https://ariascrm.com',
+        sync_google_calendar_busy: true,
+        ignore_unaccepted_calendar_invites: true,
+        ai_monthly_budget_usd: 20,
     };
 }

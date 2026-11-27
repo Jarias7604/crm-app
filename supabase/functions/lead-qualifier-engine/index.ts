@@ -9,8 +9,10 @@ import {
   DEFAULT_QUALIFIER_SYSTEM_PROMPT,
   DEFAULT_TZ,
   buildAdvisorWhatsAppAlert,
+  calculateOpenAiCostUsd,
   detectExplicitHandoffIntent,
   extractLeadFirstName,
+  filterPersonalBusyGoogleEvents,
   generateAvailableDemoSlots,
   isGoogleSheetsLead,
   isWithinBusinessHours,
@@ -137,6 +139,9 @@ interface NormalizedConfig {
   sla_escalation_minutes: number;
   sla_backup_user_id: string | null;
   crm_base_url: string;
+  sync_google_calendar_busy: boolean;
+  ignore_unaccepted_calendar_invites: boolean;
+  ai_monthly_budget_usd: number;
 }
 
 async function loadCompanyConfig(supabase: any, companyId: string): Promise<NormalizedConfig> {
@@ -189,6 +194,11 @@ async function loadCompanyConfig(supabase: any, companyId: string): Promise<Norm
     sla_escalation_minutes: Math.max(1, Math.min(240, Number(data?.sla_escalation_minutes) || 15)),
     sla_backup_user_id: data?.sla_backup_user_id || null,
     crm_base_url: String(data?.crm_base_url || 'https://ariascrm.com').replace(/\/+$/, ''),
+    sync_google_calendar_busy:
+      typeof data?.sync_google_calendar_busy === 'boolean' ? data.sync_google_calendar_busy : true,
+    ignore_unaccepted_calendar_invites:
+      typeof data?.ignore_unaccepted_calendar_invites === 'boolean' ? data.ignore_unaccepted_calendar_invites : true,
+    ai_monthly_budget_usd: Number(data?.ai_monthly_budget_usd) > 0 ? Number(data.ai_monthly_budget_usd) : 20,
   };
 }
 
@@ -717,16 +727,66 @@ async function pickAdvisorForLead(
   };
 }
 
-async function loadBusyIntervals(supabase: any, companyId: string, advisorId: string | null): Promise<Array<{ start: string; end: string }>> {
+async function logAiUsage(
+  supabase: any,
+  entry: {
+    companyId: string;
+    feature: string;
+    model: string;
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    audioSeconds?: number;
+    leadId?: string | null;
+    ticketId?: string | null;
+    metadata?: Record<string, any>;
+  },
+): Promise<void> {
+  if (!entry.companyId) return;
+  try {
+    const estimatedCostUsd = calculateOpenAiCostUsd({
+      model: entry.model,
+      promptTokens: entry.promptTokens,
+      completionTokens: entry.completionTokens,
+      audioSeconds: entry.audioSeconds,
+    });
+    await supabase.from('ai_usage_logs').insert({
+      company_id: entry.companyId,
+      feature: entry.feature,
+      provider: 'openai',
+      model: entry.model,
+      prompt_tokens: entry.promptTokens || 0,
+      completion_tokens: entry.completionTokens || 0,
+      total_tokens: entry.totalTokens || (entry.promptTokens || 0) + (entry.completionTokens || 0),
+      audio_seconds: entry.audioSeconds || 0,
+      estimated_cost_usd: estimatedCostUsd,
+      lead_id: entry.leadId || null,
+      ticket_id: entry.ticketId || null,
+      metadata: entry.metadata || {},
+    });
+  } catch (e: any) {
+    console.warn('[lead-qualifier-engine] logAiUsage warn:', e?.message || e);
+  }
+}
+
+async function loadBusyIntervals(
+  supabase: any,
+  cfg: NormalizedConfig,
+  companyId: string,
+  advisorId: string | null,
+  advisorEmail?: string | null,
+): Promise<Array<{ start: string; end: string }>> {
   const nowIso = new Date().toISOString();
   const maxIso = new Date(Date.now() + 11 * 86_400_000).toISOString();
   const busy: Array<{ start: string; end: string }> = [];
 
+  // Priority rule: only meetings/demos block demo slots; secondary follow-ups (call, whatsapp, email, quote) do not.
   let fuQ = supabase
     .from('follow_ups')
     .select('date')
     .eq('company_id', companyId)
     .eq('completed', false)
+    .in('action_type', ['meeting', 'demo'])
     .gte('date', nowIso)
     .lte('date', maxIso);
   if (advisorId) {
@@ -756,6 +816,61 @@ async function loadBusyIntervals(supabase: any, companyId: string, advisorId: st
   for (const row of bks || []) {
     if (row?.start_time && row?.end_time) {
       busy.push({ start: row.start_time, end: row.end_time });
+    }
+  }
+
+  // Advisor's own primary Google Calendar (never falls back to another team member's calendar)
+  if (cfg.sync_google_calendar_busy && advisorId) {
+    try {
+      const { data: ownCal } = await supabase
+        .from('calendar_integrations')
+        .select('id, google_email')
+        .eq('company_id', companyId)
+        .eq('provider', 'google')
+        .eq('is_active', true)
+        .eq('user_id', advisorId)
+        .limit(1)
+        .maybeSingle();
+
+      if (ownCal?.id) {
+        const supabaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        if (supabaseUrl) {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 3500);
+          try {
+            const gcalRes = await fetch(`${supabaseUrl}/functions/v1/google-calendar-sync`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(serviceKey ? { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } : {}),
+              },
+              body: JSON.stringify({
+                action: 'fetch_primary_events',
+                integration_id: ownCal.id,
+                time_min: nowIso,
+                time_max: maxIso,
+              }),
+              signal: ctrl.signal,
+            });
+            if (gcalRes.ok) {
+              const gcalJson = await gcalRes.json().catch(() => null);
+              if (gcalJson?.success && Array.isArray(gcalJson.events)) {
+                const personalBusy = filterPersonalBusyGoogleEvents(gcalJson.events, {
+                  advisorEmail: gcalJson.google_email || ownCal.google_email || advisorEmail || null,
+                  ignoreUnacceptedInvites: cfg.ignore_unaccepted_calendar_invites,
+                  ignoreAllDayEvents: true,
+                });
+                busy.push(...personalBusy);
+              }
+            }
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+      }
+    } catch (calErr: any) {
+      console.warn('[lead-qualifier-engine] loadBusyIntervals Google Calendar warn:', calErr?.message || calErr);
     }
   }
 
@@ -853,7 +968,16 @@ async function callQualifierOpenAi(input: {
 
   const data = await res.json();
   const rawContent = data?.choices?.[0]?.message?.content || '';
-  return parseQualifierAiJson(rawContent);
+  const usage = {
+    model: String(data?.model || 'gpt-4o-mini'),
+    promptTokens: Number(data?.usage?.prompt_tokens) || 0,
+    completionTokens: Number(data?.usage?.completion_tokens) || 0,
+    totalTokens: Number(data?.usage?.total_tokens) || 0,
+  };
+  return {
+    output: parseQualifierAiJson(rawContent),
+    usage,
+  };
 }
 
 async function createDemoFollowUpAndMeet(
@@ -1566,13 +1690,15 @@ async function enrollSingleLead(
         });
       }
 
+      const pickedSim = await pickAdvisorForLead(supabase, companyId, simLead);
+      const simBusy = await loadBusyIntervals(supabase, cfg, companyId, pickedSim.advisorId, pickedSim.advisorEmail);
       const slots = generateAvailableDemoSlots({
         now: simulatedNow,
         businessHours: cfg.business_hours,
         timezone: cfg.timezone,
         durationMinutes: cfg.demo_duration_minutes,
         bufferMinutes: cfg.demo_buffer_minutes,
-        busyIntervals: [],
+        busyIntervals: simBusy,
         count: 3,
       });
 
@@ -1583,7 +1709,7 @@ async function enrollSingleLead(
 
       const history = Array.isArray(payload?.history) ? payload.history.map((h: any) => String(h)) : [];
       const offeredPrev = Array.isArray(payload?.offered_slots) ? payload.offered_slots : [];
-      const aiOut = await callQualifierOpenAi({
+      const { output: aiOut, usage: aiUsage } = await callQualifierOpenAi({
         apiKey,
         cfg,
         lead: simLead,
@@ -1593,6 +1719,16 @@ async function enrollSingleLead(
         incomingMessage: incoming,
         availableSlots: slots,
         offeredSlots: offeredPrev,
+      });
+
+      await logAiUsage(supabase, {
+        companyId,
+        feature: 'lead_qualifier_sim',
+        model: aiUsage.model,
+        promptTokens: aiUsage.promptTokens,
+        completionTokens: aiUsage.completionTokens,
+        totalTokens: aiUsage.totalTokens,
+        metadata: { action: aiOut.action },
       });
 
       return json({
@@ -1731,7 +1867,13 @@ async function enrollSingleLead(
       }
 
       const pickedForSlots = await pickAdvisorForLead(supabase, companyId, lead, false);
-      const busy = await loadBusyIntervals(supabase, companyId, pickedForSlots.advisorId);
+      const busy = await loadBusyIntervals(
+        supabase,
+        cfg,
+        companyId,
+        pickedForSlots.advisorId,
+        pickedForSlots.advisorEmail,
+      );
       const freshSlots = generateAvailableDemoSlots({
         now,
         businessHours: cfg.business_hours,
@@ -1743,7 +1885,7 @@ async function enrollSingleLead(
       });
 
       const prevOffered = Array.isArray(session?.offered_slots) ? (session.offered_slots as DemoSlot[]) : [];
-      const aiOut = await callQualifierOpenAi({
+      const { output: aiOut, usage: aiUsage } = await callQualifierOpenAi({
         apiKey,
         cfg,
         lead,
@@ -1753,6 +1895,18 @@ async function enrollSingleLead(
         incomingMessage: incomingText,
         availableSlots: freshSlots,
         offeredSlots: prevOffered,
+      });
+
+      await logAiUsage(supabase, {
+        companyId,
+        feature: 'lead_qualifier',
+        model: aiUsage.model,
+        promptTokens: aiUsage.promptTokens,
+        completionTokens: aiUsage.completionTokens,
+        totalTokens: aiUsage.totalTokens,
+        leadId,
+        ticketId,
+        metadata: { action: aiOut.action, turn: currentTurns + 1 },
       });
 
       if (aiOut.action === 'handoff_human') {

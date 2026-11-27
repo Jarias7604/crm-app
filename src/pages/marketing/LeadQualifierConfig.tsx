@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
+import { AiUsageCostCard } from '../../components/AiUsageCostCard';
 import { Button } from '../../components/ui/Button';
 import {
     buildDefaultQualifierConfig,
@@ -591,6 +592,13 @@ export default function LeadQualifierConfig() {
                 </div>
             )}
 
+            {/* AI Usage Cost Card */}
+            <AiUsageCostCard
+                companyId={companyId}
+                budgetUsd={config.ai_monthly_budget_usd}
+                variant="compact"
+            />
+
             {/* Navigation Tabs */}
             <div className="flex items-center gap-1.5 bg-white border border-slate-200/80 rounded-2xl p-1.5 overflow-x-auto shadow-sm">
                 {[
@@ -833,7 +841,7 @@ export default function LeadQualifierConfig() {
                             </label>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
                             <div>
                                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                                     Duración Demo (min)
@@ -864,6 +872,72 @@ export default function LeadQualifierConfig() {
                                     className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
                                 />
                             </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                    Presupuesto IA / mes (USD)
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={5000}
+                                    step={1}
+                                    value={config.ai_monthly_budget_usd}
+                                    onChange={(e) =>
+                                        setConfig({
+                                            ...config,
+                                            ai_monthly_budget_usd: Math.max(1, Number(e.target.value) || 20),
+                                        })
+                                    }
+                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                                    <Calendar className="w-3.5 h-3.5 text-[#4449AA]" />
+                                    Reglas Inteligentes de Agenda & Prioridad de Demos
+                                </div>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Demos tienen prioridad
+                                </span>
+                            </div>
+
+                            <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={config.sync_google_calendar_busy}
+                                    onChange={(e) =>
+                                        setConfig({ ...config, sync_google_calendar_busy: e.target.checked })
+                                    }
+                                    className="accent-[#4449AA] mt-0.5"
+                                />
+                                <span>
+                                    <strong>Sincronizar Google Calendar del asesor asignado:</strong> bloquea solo eventos ocupados de su calendario principal.
+                                </span>
+                            </label>
+
+                            <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={config.ignore_unaccepted_calendar_invites}
+                                    onChange={(e) =>
+                                        setConfig({
+                                            ...config,
+                                            ignore_unaccepted_calendar_invites: e.target.checked,
+                                        })
+                                    }
+                                    className="accent-[#4449AA] mt-0.5"
+                                />
+                                <span>
+                                    <strong>Ignorar invitaciones &quot;en la lupa&quot; y calendarios compartidos:</strong> demos de Patricia u otros compañeros sin aceptar / opcionales no bloquean tu agenda.
+                                </span>
+                            </label>
+
+                            <p className="text-[11px] text-emerald-800 bg-emerald-50/80 border border-emerald-200/80 rounded-lg px-2.5 py-1.5">
+                                Prioridad Demos CRM: los seguimientos secundarios (<strong>Llamada</strong>, WhatsApp, Email o Cotización) NO bloquean horarios disponibles para Demos.
+                            </p>
                         </div>
 
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between">

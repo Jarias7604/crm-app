@@ -235,3 +235,116 @@ test('9. Detects Google Sheets leads accurately via source, raw_meta_payload.sou
   assert.equal(mod.isGoogleSheetsLead({ source: 'facebook_ads', raw_meta_payload: { source: 'meta' } }), false);
   assert.equal(mod.isGoogleSheetsLead(null), false);
 });
+
+test('10. Filters Google Calendar events to ignore unaccepted/optional/shared "en la lupa" and transparent items', () => {
+  const events = [
+    // Own busy meeting -> MUST block
+    {
+      status: 'confirmed',
+      transparency: 'opaque',
+      organizer: { email: 'jimmy@ariasdefense.com', self: true },
+      start: { dateTime: '2026-11-30T15:00:00Z' },
+      end: { dateTime: '2026-11-30T15:30:00Z' },
+    },
+    // Patricia invite "en la lupa" (needsAction) -> MUST NOT block by default
+    {
+      status: 'confirmed',
+      transparency: 'opaque',
+      organizer: { email: 'patricia@ariasdefense.com' },
+      attendees: [
+        { email: 'patricia@ariasdefense.com', organizer: true, responseStatus: 'accepted' },
+        { email: 'jimmy@ariasdefense.com', self: true, responseStatus: 'needsAction' },
+      ],
+      start: { dateTime: '2026-11-30T16:00:00Z' },
+      end: { dateTime: '2026-11-30T16:30:00Z' },
+    },
+    // Patricia invite accepted BUT optional ("en la lupa") -> MUST NOT block
+    {
+      status: 'confirmed',
+      transparency: 'opaque',
+      organizer: { email: 'patricia@ariasdefense.com' },
+      attendees: [
+        { email: 'jimmy@ariasdefense.com', self: true, optional: true, responseStatus: 'accepted' },
+      ],
+      start: { dateTime: '2026-11-30T17:00:00Z' },
+      end: { dateTime: '2026-11-30T17:30:00Z' },
+    },
+    // Team meeting explicitly accepted & required -> MUST block
+    {
+      status: 'confirmed',
+      transparency: 'opaque',
+      organizer: { email: 'patricia@ariasdefense.com' },
+      attendees: [
+        { email: 'jimmy@ariasdefense.com', self: true, optional: false, responseStatus: 'accepted' },
+      ],
+      start: { dateTime: '2026-11-30T18:00:00Z' },
+      end: { dateTime: '2026-11-30T18:30:00Z' },
+    },
+    // Event marked "Disponible" (transparent) -> MUST NOT block
+    {
+      status: 'confirmed',
+      transparency: 'transparent',
+      organizer: { email: 'jimmy@ariasdefense.com', self: true },
+      start: { dateTime: '2026-11-30T19:00:00Z' },
+      end: { dateTime: '2026-11-30T19:30:00Z' },
+    },
+    // Cancelled event -> MUST NOT block
+    {
+      status: 'cancelled',
+      organizer: { email: 'jimmy@ariasdefense.com', self: true },
+      start: { dateTime: '2026-11-30T20:00:00Z' },
+      end: { dateTime: '2026-11-30T20:30:00Z' },
+    },
+    // All-day birthday/reminder -> MUST NOT block
+    {
+      status: 'confirmed',
+      organizer: { email: 'jimmy@ariasdefense.com', self: true },
+      start: { date: '2026-11-30' },
+      end: { date: '2026-12-01' },
+    },
+  ];
+
+  const busy = mod.filterPersonalBusyGoogleEvents(events, {
+    advisorEmail: 'jimmy@ariasdefense.com',
+    ignoreUnacceptedInvites: true,
+    ignoreAllDayEvents: true,
+  });
+  assert.equal(busy.length, 2);
+  assert.equal(busy[0].start, '2026-11-30T15:00:00Z');
+  assert.equal(busy[1].start, '2026-11-30T18:00:00Z');
+});
+
+test('11. Calculates OpenAI gpt-4o-mini and Whisper audio USD costs accurately', () => {
+  // gpt-4o-mini: 1000 prompt ($0.15/1M) + 200 completion ($0.60/1M) = 0.00015 + 0.00012 = 0.00027
+  const miniCost = mod.calculateOpenAiCostUsd({
+    model: 'gpt-4o-mini',
+    promptTokens: 1000,
+    completionTokens: 200,
+  });
+  assert.equal(miniCost, 0.00027);
+
+  // whisper-1: 30s = 0.5 min * $0.006 = $0.003
+  const whisperCost = mod.calculateOpenAiCostUsd({
+    model: 'whisper-1',
+    audioSeconds: 30,
+  });
+  assert.equal(whisperCost, 0.003);
+
+  assert.equal(mod.estimateAudioDurationSeconds(45000), 15);
+  assert.equal(mod.estimateAudioDurationSeconds(100), 1);
+});
+
+test('12. Edge Function google-calendar-sync/index.ts bundles cleanly without syntax/import errors', async () => {
+  const calOutFile = path.join(tmpDir, 'google-calendar-sync.bundle.mjs');
+  await esbuild.build({
+    entryPoints: [path.resolve('supabase/functions/google-calendar-sync/index.ts')],
+    bundle: true,
+    platform: 'neutral',
+    format: 'esm',
+    outfile: calOutFile,
+    external: ['https://esm.sh/*', 'https://deno.land/*'],
+    logLevel: 'silent',
+  });
+  assert.ok(fs.existsSync(calOutFile));
+  assert.ok(fs.statSync(calOutFile).size > 2000);
+});

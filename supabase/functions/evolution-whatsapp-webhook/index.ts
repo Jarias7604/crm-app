@@ -1577,7 +1577,12 @@ async function ingestWhatsAppEntry(
     ) {
       const aiCfg = await getAiCfg();
       if (aiCfg.openAiKey) {
-        const transcript = await transcribeAudio(aiCfg.openAiKey, storedInline.bytes, storedInline.mime || 'audio/ogg');
+        const transcript = await transcribeAudio(aiCfg.openAiKey, storedInline.bytes, storedInline.mime || 'audio/ogg', {
+          supabase,
+          companyId,
+          leadId: targetTicket?.lead_id || null,
+          ticketId: targetTicket?.id || null,
+        });
         if (transcript) {
           inlineAudioTranscript = transcript;
           if (comment?.id) {
@@ -1706,7 +1711,13 @@ async function ingestWhatsAppEntry(
       const reply = await askOpenAi(
         aiCfg.openAiKey,
         aiCfg.prompts[supportChannel] || DEFAULT_AI_PROMPTS.soporte,
-        `El cliente (${clientDisplayName}) escribió por WhatsApp: "${displayText}". Redacta la respuesta breve y directa que se enviará a su WhatsApp.`
+        `El cliente (${clientDisplayName}) escribió por WhatsApp: "${displayText}". Redacta la respuesta breve y directa que se enviará a su WhatsApp.`,
+        {
+          supabase,
+          companyId,
+          leadId: effectiveLeadId || null,
+          ticketId: targetTicket?.id || null,
+        }
       );
       if (reply) {
         const aiLine = `[${fmtTime(new Date())}] 👨‍💻 ${aiBotLabel(supportChannel)}: ${reply}`;
@@ -1959,7 +1970,11 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
   if (row?.message_type === 'audio' && !row.from_me && stored.bytes) {
     const aiCfg = await loadSupportAiConfig(supabase, row.company_id || null);
     if (aiCfg.openAiKey) {
-      const transcript = await transcribeAudio(aiCfg.openAiKey, stored.bytes, stored.mime || 'audio/ogg');
+      const transcript = await transcribeAudio(aiCfg.openAiKey, stored.bytes, stored.mime || 'audio/ogg', {
+        supabase,
+        companyId: row.company_id || '',
+        ticketId: row.ticket_id || null,
+      });
       if (transcript && row.comment_id) {
         const { data: c } = await supabase.from('ticket_comments').select('body').eq('id', row.comment_id).maybeSingle();
         if (c && !String(c.body || '').includes('📝 Transcripción IA')) {
@@ -2026,7 +2041,13 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
           aiCfg.prompts[ch] || DEFAULT_AI_PROMPTS.soporte,
           transcript
             ? `El cliente (${t.lead_name || 'Cliente'}) envió una nota de voz diciendo: "${transcript}". Redacta la respuesta que se enviará a su WhatsApp.`
-            : `El cliente (${t.lead_name || 'Cliente'}) envió una nota de voz. Redacta una respuesta amable confirmando recepción y que el equipo ya la está escuchando.`
+            : `El cliente (${t.lead_name || 'Cliente'}) envió una nota de voz. Redacta una respuesta amable confirmando recepción y que el equipo ya la está escuchando.`,
+          {
+            supabase,
+            companyId: t.company_id || row.company_id || '',
+            leadId: t.lead_id || null,
+            ticketId: t.id || null,
+          }
         );
         if (reply) {
           const { data: aiComment } = await supabase

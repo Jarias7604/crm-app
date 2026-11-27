@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { campaignService, type Campaign } from '../services/marketing/campaignService';
 import { marketingStatsService, type HeatmapLead } from '../services/marketing/marketingStats';
+import { AiUsageCostCard } from '../components/AiUsageCostCard';
 
 type ExportType = 'leads_full' | 'pipeline_snapshot' | 'lost_reasons' | 'performance_agents';
 type TabType = 'bi' | 'campaigns' | 'export';
@@ -515,6 +516,21 @@ export default function Reports() {
                                     <p className="text-3xl font-black text-amber-500">{dashboardData?.stats?.conversionRate || 0}%</p>
                                 </div>
                             </div>
+
+                            {/* AI Usage Cost Card */}
+                            <AiUsageCostCard
+                                companyId={activeCompanyId}
+                                startDate={startDate}
+                                periodLabel={
+                                    biDateRange === '30d'
+                                        ? 'Últimos 30 Días'
+                                        : biDateRange === '90d'
+                                        ? 'Últimos 90 Días'
+                                        : 'Este Año'
+                                }
+                                variant="bi"
+                                showConfigLink
+                            />
 
                             {/* Charts Row 1 */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

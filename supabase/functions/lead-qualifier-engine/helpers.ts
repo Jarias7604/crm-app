@@ -689,3 +689,108 @@ export function parseQualifierAiJson(rawContent: string): QualifierAiTurnOutput 
     };
   }
 }
+
+export interface GoogleCalendarEventLike {
+  status?: string | null;
+  transparency?: string | null;
+  start?: { dateTime?: string | null; date?: string | null } | null;
+  end?: { dateTime?: string | null; date?: string | null } | null;
+  organizer?: { email?: string | null; self?: boolean | null } | null;
+  creator?: { email?: string | null; self?: boolean | null } | null;
+  attendees?: Array<{
+    email?: string | null;
+    self?: boolean | null;
+    optional?: boolean | null;
+    responseStatus?: string | null;
+  }> | null;
+}
+
+export function filterPersonalBusyGoogleEvents(
+  events: GoogleCalendarEventLike[],
+  opts?: {
+    advisorEmail?: string | null;
+    ignoreUnacceptedInvites?: boolean;
+    ignoreAllDayEvents?: boolean;
+  },
+): Array<{ start: string; end: string }> {
+  const ignoreUnaccepted = opts?.ignoreUnacceptedInvites !== false;
+  const ignoreAllDay = opts?.ignoreAllDayEvents !== false;
+  const advisorEmailNorm = String(opts?.advisorEmail || '').trim().toLowerCase();
+  const out: Array<{ start: string; end: string }> = [];
+
+  for (const ev of events || []) {
+    if (!ev || ev.status === 'cancelled') continue;
+    if (ev.transparency === 'transparent') continue;
+
+    const startDt = ev.start?.dateTime ? String(ev.start.dateTime) : '';
+    const endDt = ev.end?.dateTime ? String(ev.end.dateTime) : '';
+    if (!startDt || !endDt) {
+      if (ignoreAllDay) continue;
+      continue;
+    }
+
+    const startMs = Date.parse(startDt);
+    const endMs = Date.parse(endDt);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) continue;
+
+    const organizerEmailNorm = String(ev.organizer?.email || '').trim().toLowerCase();
+    const creatorEmailNorm = String(ev.creator?.email || '').trim().toLowerCase();
+    const isOrganizer =
+      Boolean(ev.organizer?.self) ||
+      (Boolean(advisorEmailNorm) && organizerEmailNorm === advisorEmailNorm) ||
+      (!ev.organizer &&
+        (Boolean(ev.creator?.self) || (Boolean(advisorEmailNorm) && creatorEmailNorm === advisorEmailNorm)));
+
+    const attendees = Array.isArray(ev.attendees) ? ev.attendees : [];
+    const selfAttendee = attendees.find(
+      (a) =>
+        a?.self === true ||
+        (Boolean(advisorEmailNorm) && String(a?.email || '').trim().toLowerCase() === advisorEmailNorm),
+    );
+
+    if (selfAttendee) {
+      const resp = String(selfAttendee.responseStatus || '').toLowerCase();
+      if (resp === 'declined') continue;
+      if (!isOrganizer) {
+        if (selfAttendee.optional === true) continue;
+        if (ignoreUnaccepted && resp !== 'accepted') continue;
+      }
+    } else if (!isOrganizer && organizerEmailNorm && ignoreUnaccepted) {
+      // Event on primary calendar owned by someone else without explicit self acceptance ("en la lupa")
+      continue;
+    }
+
+    out.push({ start: startDt, end: endDt });
+  }
+
+  return out;
+}
+
+export function calculateOpenAiCostUsd(input: {
+  model: string;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  audioSeconds?: number | null;
+}): number {
+  const model = String(input.model || '').toLowerCase().trim();
+  const promptTokens = Math.max(0, Number(input.promptTokens) || 0);
+  const completionTokens = Math.max(0, Number(input.completionTokens) || 0);
+  const audioSeconds = Math.max(0, Number(input.audioSeconds) || 0);
+
+  let cost = 0;
+  if (model.includes('whisper')) {
+    cost = (audioSeconds / 60) * 0.006;
+  } else if (model.includes('mini')) {
+    cost = (promptTokens * 0.15) / 1_000_000 + (completionTokens * 0.60) / 1_000_000;
+  } else if (model.includes('gpt-4o')) {
+    cost = (promptTokens * 2.50) / 1_000_000 + (completionTokens * 10.0) / 1_000_000;
+  } else {
+    cost = (promptTokens * 0.15) / 1_000_000 + (completionTokens * 0.60) / 1_000_000;
+  }
+
+  return Number(cost.toFixed(6));
+}
+
+export function estimateAudioDurationSeconds(byteLength: number): number {
+  return Math.max(1, Math.round(Math.max(0, Number(byteLength) || 0) / 3000));
+}

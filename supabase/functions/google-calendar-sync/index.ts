@@ -108,6 +108,41 @@ async function fetchGoogleEvents(integration: any) {
 }
 
 
+async function ensureValidGoogleAccessToken(integration: any): Promise<string> {
+    let accessToken = integration.access_token;
+    const expiresAt = new Date(integration.token_expires_at);
+    const isExpired = expiresAt.getTime() - Date.now() < 60_000;
+
+    if (isExpired) {
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: GOOGLE_CLIENT_ID!,
+                client_secret: GOOGLE_CLIENT_SECRET!,
+                refresh_token: integration.refresh_token,
+                grant_type: 'refresh_token',
+            })
+        });
+        const tokens = await refreshResponse.json();
+        if (tokens.error) {
+            await supabase
+                .from('calendar_integrations')
+                .update({ is_active: false })
+                .eq('id', integration.id);
+            throw new Error(`Token expirado para ${integration.google_email || integration.id}.`);
+        }
+        accessToken = tokens.access_token;
+        await supabase.from('calendar_integrations').update({
+            access_token: tokens.access_token,
+            token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+            last_synced_at: new Date().toISOString(),
+        }).eq('id', integration.id);
+    }
+
+    return accessToken;
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -478,6 +513,60 @@ serve(async (req) => {
             return new Response(JSON.stringify({
                 success: true,
                 event: updatedEvent,
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
+        // ─── ACTION: fetch_primary_events (Advisor Primary Calendar Only) ───────
+        if (action === 'fetch_primary_events') {
+            const { integration_id: targetIntId, time_min, time_max } = body;
+            if (!targetIntId) throw new Error('integration_id is required');
+
+            const { data: integration, error: intError } = await supabase
+                .from('calendar_integrations')
+                .select('*')
+                .eq('id', targetIntId)
+                .eq('is_active', true)
+                .single();
+
+            if (intError || !integration) {
+                return new Response(JSON.stringify({ success: false, events: [], error: 'Integration not found or inactive' }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const accessToken = await ensureValidGoogleAccessToken(integration);
+            const minIso = time_min || new Date().toISOString();
+            const maxIso = time_max || new Date(Date.now() + 11 * 86_400_000).toISOString();
+
+            const url = [
+                'https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=',
+                encodeURIComponent(minIso),
+                '&timeMax=',
+                encodeURIComponent(maxIso),
+                '&singleEvents=true&orderBy=startTime&maxResults=250',
+            ].join('');
+
+            const eventsRes = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+            const eventsData = await eventsRes.json();
+
+            if (!eventsRes.ok || eventsData.error) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    events: [],
+                    error: eventsData?.error?.message || `HTTP ${eventsRes.status}`,
+                }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            return new Response(JSON.stringify({
+                success: true,
+                google_email: integration.google_email || null,
+                events: Array.isArray(eventsData.items) ? eventsData.items : [],
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });

@@ -72,6 +72,9 @@ export function buildDefaultQualifierConfig(companyId: string): LeadQualifierCon
         sla_escalation_minutes: 15,
         sla_backup_user_id: null,
         crm_base_url: typeof window !== 'undefined' ? window.location.origin : 'https://ariascrm.com',
+        sync_google_calendar_busy: true,
+        ignore_unaccepted_calendar_invites: true,
+        ai_monthly_budget_usd: 20,
     };
 }
 
@@ -124,6 +127,16 @@ function hydrateConfig(companyId: string, row: any): LeadQualifierConfig {
         sla_escalation_minutes: Number(row.sla_escalation_minutes) || base.sla_escalation_minutes,
         sla_backup_user_id: row.sla_backup_user_id || null,
         crm_base_url: String(row.crm_base_url || base.crm_base_url),
+        sync_google_calendar_busy:
+            typeof row.sync_google_calendar_busy === 'boolean'
+                ? row.sync_google_calendar_busy
+                : base.sync_google_calendar_busy,
+        ignore_unaccepted_calendar_invites:
+            typeof row.ignore_unaccepted_calendar_invites === 'boolean'
+                ? row.ignore_unaccepted_calendar_invites
+                : base.ignore_unaccepted_calendar_invites,
+        ai_monthly_budget_usd:
+            Number(row.ai_monthly_budget_usd) > 0 ? Number(row.ai_monthly_budget_usd) : base.ai_monthly_budget_usd,
     };
 }
 
@@ -175,6 +188,9 @@ export const leadQualifierService = {
             sla_escalation_minutes: merged.sla_escalation_minutes,
             sla_backup_user_id: merged.sla_backup_user_id || null,
             crm_base_url: merged.crm_base_url,
+            sync_google_calendar_busy: merged.sync_google_calendar_busy,
+            ignore_unaccepted_calendar_invites: merged.ignore_unaccepted_calendar_invites,
+            ai_monthly_budget_usd: merged.ai_monthly_budget_usd,
             updated_by: userId || null,
             updated_at: new Date().toISOString(),
         };
