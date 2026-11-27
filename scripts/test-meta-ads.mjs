@@ -177,3 +177,37 @@ test('6. resolveWonDealAmount and computeRoiMetrics match CRM Cerrado/Cliente RO
   assert.equal(roiZero.roas, null);
   assert.equal(roiZero.cac, null);
 });
+
+test('7. classifyLeadOrigin and classifyWonCohort attribute Redes Sociales, Meta Ads, and same/previous cohorts', () => {
+  const fbLead = mod.classifyLeadOrigin({ source: 'facebook_ads', meta_campaign_name: 'ERP SV Nov' });
+  assert.equal(fbLead.bucket, 'meta_ads');
+  assert.equal(fbLead.is_meta_ads, true);
+  assert.equal(fbLead.is_meta_or_social, true);
+  assert.equal(fbLead.source_label, 'Facebook Ads');
+  assert.equal(fbLead.campaign_label, 'ERP SV Nov');
+
+  const socialLead = mod.classifyLeadOrigin({ source: 'redes_sociales' });
+  assert.equal(socialLead.bucket, 'social');
+  assert.equal(socialLead.is_meta_ads, false);
+  assert.equal(socialLead.is_meta_or_social, true);
+  assert.equal(socialLead.source_label, 'Redes Sociales');
+
+  const sheetLead = mod.classifyLeadOrigin({
+    source: 'otro',
+    raw_meta_payload: { sheet_name: 'Leads_Nov_2026', campaign_name: 'Campaña ERP' },
+  });
+  assert.equal(sheetLead.bucket, 'meta_ads');
+  assert.equal(sheetLead.is_meta_ads, true);
+  assert.equal(sheetLead.campaign_label, 'Campaña ERP');
+
+  const directLead = mod.classifyLeadOrigin({ source: 'otro' });
+  assert.equal(directLead.bucket, 'other');
+  assert.equal(directLead.is_meta_or_social, false);
+  assert.equal(directLead.source_label, 'Otros');
+
+  const sameMonth = mod.classifyWonCohort('2026-11-04', '2026-11-13', '2026-11-01');
+  assert.deepEqual(sameMonth, { cohort: 'same_period', days_to_close: 9 });
+
+  const prevMonth = mod.classifyWonCohort('2026-10-18', '2026-11-06', '2026-11-01');
+  assert.deepEqual(prevMonth, { cohort: 'previous_period', days_to_close: 19 });
+});

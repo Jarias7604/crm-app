@@ -16,16 +16,40 @@ export interface MetaAdsDailyPoint {
     won_deals: number;
 }
 
+export type LeadOriginBucket = 'meta_ads' | 'social' | 'other';
+export type WonDealCohort = 'same_period' | 'previous_period';
+
 export interface MetaAdsWonDealItem {
     id: string;
     name: string;
     company_name: string | null;
+    advisor_name?: string | null;
     status: string;
     source: string;
+    source_label?: string;
+    origin_bucket?: LeadOriginBucket;
     is_meta_source: boolean;
+    is_meta_ads?: boolean;
+    campaign_label?: string | null;
     amount: number;
     value: number;
+    created_date?: string;
     won_date: string;
+    cohort?: WonDealCohort;
+    days_to_close?: number;
+}
+
+export interface MetaAdsCohortSummary {
+    same_period_deals: number;
+    same_period_amount: number;
+    previous_period_deals: number;
+    previous_period_amount: number;
+    meta_ads_deals: number;
+    meta_ads_amount: number;
+    social_deals: number;
+    social_amount: number;
+    other_deals: number;
+    other_amount: number;
 }
 
 export interface MetaAdsRoiSummary {
@@ -99,6 +123,7 @@ export interface MetaAdsInsightsResponse {
         won_potential?: number;
         won_meta_deals?: number;
         won_meta_amount?: number;
+        cohort_summary?: MetaAdsCohortSummary;
         won_items?: MetaAdsWonDealItem[];
         ai_cost_usd: number;
         ai_calls: number;

@@ -306,6 +306,88 @@ function toZonedYmd(date: Date, timeZone = DEFAULT_TZ): string {
   }
 }
 
+export type LeadOriginBucket = 'meta_ads' | 'social' | 'other';
+export type WonDealCohort = 'same_period' | 'previous_period';
+
+const CRM_SOURCE_LABELS: Record<string, string> = {
+  facebook_ads: 'Facebook Ads',
+  redes_sociales: 'Redes Sociales',
+  whatsapp: 'WhatsApp',
+  referidos: 'Referidos',
+  visita_campo: 'Visita Campo',
+  sitio_web: 'Sitio Web',
+  llamada_fria: 'Llamada Fría',
+  evento: 'Evento',
+  otro: 'Otros',
+};
+
+export function classifyLeadOrigin(lead: {
+  source?: string | null;
+  meta_campaign_name?: string | null;
+  raw_meta_payload?: Record<string, any> | null;
+}): {
+  bucket: LeadOriginBucket;
+  is_meta_or_social: boolean;
+  is_meta_ads: boolean;
+  source_label: string;
+  campaign_label: string | null;
+} {
+  const rawSource = String(lead?.source || '').trim();
+  const srcLower = rawSource.toLowerCase();
+  const payload = lead?.raw_meta_payload && typeof lead.raw_meta_payload === 'object' ? lead.raw_meta_payload : null;
+  const payloadSrc = String(payload?.source || '').trim().toLowerCase();
+
+  const rawCampaign =
+    lead?.meta_campaign_name ||
+    payload?.campaign_name ||
+    payload?.ad_name ||
+    payload?.sheet_name ||
+    null;
+  const campaignLabel = rawCampaign ? String(rawCampaign).trim() || null : null;
+
+  const hasMetaPayloadHint = Boolean(
+    payload?.sheet_name ||
+      payload?.campaign_name ||
+      payload?.ad_id ||
+      payload?.form_id ||
+      /facebook|meta|sheet|fb/.test(payloadSrc),
+  );
+  const hasMetaSource = /facebook|meta|sheet|leadgen|instagram_ads|^fb$/.test(srcLower);
+  const isMetaAds = Boolean(String(lead?.meta_campaign_name || '').trim() || hasMetaPayloadHint || hasMetaSource);
+  const isSocial = !isMetaAds && /redes_sociales|redes|social|instagram|\big\b|tiktok/.test(srcLower);
+
+  const bucket: LeadOriginBucket = isMetaAds ? 'meta_ads' : isSocial ? 'social' : 'other';
+  const mappedLabel = CRM_SOURCE_LABELS[srcLower] || (rawSource || 'Otros');
+
+  return {
+    bucket,
+    is_meta_or_social: bucket === 'meta_ads' || bucket === 'social',
+    is_meta_ads: bucket === 'meta_ads',
+    source_label: mappedLabel,
+    campaign_label: campaignLabel,
+  };
+}
+
+export function classifyWonCohort(
+  createdDateYmd: string,
+  wonDateYmd: string,
+  rangeSinceYmd: string,
+): { cohort: WonDealCohort; days_to_close: number } {
+  const created = String(createdDateYmd || '').slice(0, 10);
+  const won = String(wonDateYmd || '').slice(0, 10);
+  const cohort: WonDealCohort = created && rangeSinceYmd && created >= rangeSinceYmd ? 'same_period' : 'previous_period';
+
+  let days = 0;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(created) && /^\d{4}-\d{2}-\d{2}$/.test(won)) {
+    const cMs = Date.parse(`${created}T12:00:00Z`);
+    const wMs = Date.parse(`${won}T12:00:00Z`);
+    if (Number.isFinite(cMs) && Number.isFinite(wMs)) {
+      days = Math.max(0, Math.round((wMs - cMs) / 86_400_000));
+    }
+  }
+  return { cohort, days_to_close: days };
+}
+
 export function computeDateRangePreset(
   preset: MetaAdsPreset,
   now = new Date(),

@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   aggregateMetaInsights,
+  classifyLeadOrigin,
+  classifyWonCohort,
   computeDateRangePreset,
   computeRoiMetrics,
   normalizeAdAccountId,
@@ -335,7 +337,7 @@ Deno.serve(async (req: Request) => {
         .order('created_at', { ascending: true }),
       supabase
         .from('leads')
-        .select('id, name, company_name, source, status, value, closing_amount, internal_won_date, created_at, raw_meta_payload')
+        .select('id, name, company_name, assigned_to, source, status, value, closing_amount, internal_won_date, created_at, meta_campaign_name, raw_meta_payload')
         .eq('company_id', companyId)
         .in('status', ['Cerrado', 'Cliente'])
         .gte('internal_won_date', sinceTs)
@@ -344,13 +346,25 @@ Deno.serve(async (req: Request) => {
         .limit(2000),
     ]);
 
+    const advisorIds = [...new Set((wonLeads || []).map((l: any) => l.assigned_to).filter(Boolean))];
+    const advisorMap = new Map<string, string>();
+    if (advisorIds.length > 0) {
+      const { data: advisorProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', advisorIds);
+      for (const p of advisorProfiles || []) {
+        if (p?.id && p?.full_name) advisorMap.set(p.id, p.full_name);
+      }
+    }
+
     const crmLeadsByDay = new Map<string, number>();
     let totalCrmLeads = 0;
     let metaSheetLeads = 0;
 
     for (const l of crmLeads || []) {
       totalCrmLeads++;
-      if (isMetaOrSheetsLead(l)) metaSheetLeads++;
+      if (classifyLeadOrigin(l).is_meta_or_social || isMetaOrSheetsLead(l)) metaSheetLeads++;
       const dayKey = toSvYmd(l.created_at);
       if (dayKey) crmLeadsByDay.set(dayKey, (crmLeadsByDay.get(dayKey) || 0) + 1);
     }
@@ -364,39 +378,79 @@ Deno.serve(async (req: Request) => {
     let wonPotential = 0;
     let wonMetaDeals = 0;
     let wonMetaAmount = 0;
+    let samePeriodDeals = 0;
+    let samePeriodAmount = 0;
+    let previousPeriodDeals = 0;
+    let previousPeriodAmount = 0;
+    let metaAdsDeals = 0;
+    let metaAdsAmount = 0;
+    let socialDeals = 0;
+    let socialAmount = 0;
+    let otherDeals = 0;
+    let otherAmount = 0;
     const wonItems: any[] = [];
 
     for (const l of wonLeads || []) {
       const dealAmount = resolveWonDealAmount(l);
       const dealPotential = Number(l.value) || 0;
-      const isMetaSource = isMetaOrSheetsLead(l);
+      const origin = classifyLeadOrigin(l);
+      const createdDateKey = toSvYmd(l.created_at);
+      const wonDateKey = toSvYmd(l.internal_won_date || l.created_at);
+      const cohortInfo = classifyWonCohort(createdDateKey, wonDateKey, since);
+
       wonDeals++;
       if (l.status === 'Cerrado') wonClosedCount++;
       if (l.status === 'Cliente') wonClientCount++;
       wonAmount += dealAmount;
       wonPotential += dealPotential;
-      if (isMetaSource) {
+      if (origin.is_meta_or_social) {
         wonMetaDeals++;
         wonMetaAmount += dealAmount;
       }
 
-      const wonDateKey = toSvYmd(l.internal_won_date || l.created_at);
+      if (cohortInfo.cohort === 'same_period') {
+        samePeriodDeals++;
+        samePeriodAmount += dealAmount;
+      } else {
+        previousPeriodDeals++;
+        previousPeriodAmount += dealAmount;
+      }
+
+      if (origin.bucket === 'meta_ads') {
+        metaAdsDeals++;
+        metaAdsAmount += dealAmount;
+      } else if (origin.bucket === 'social') {
+        socialDeals++;
+        socialAmount += dealAmount;
+      } else {
+        otherDeals++;
+        otherAmount += dealAmount;
+      }
+
       if (wonDateKey) {
         wonAmountByDay.set(wonDateKey, Number(((wonAmountByDay.get(wonDateKey) || 0) + dealAmount).toFixed(2)));
         wonDealsByDay.set(wonDateKey, (wonDealsByDay.get(wonDateKey) || 0) + 1);
       }
 
-      if (wonItems.length < 50) {
+      if (wonItems.length < 100) {
         wonItems.push({
           id: l.id,
           name: l.name || 'Lead sin nombre',
           company_name: l.company_name || null,
+          advisor_name: l.assigned_to ? advisorMap.get(l.assigned_to) || null : null,
           status: l.status,
-          source: l.source || 'Otros',
-          is_meta_source: isMetaSource,
+          source: l.source || 'otro',
+          source_label: origin.source_label,
+          origin_bucket: origin.bucket,
+          is_meta_source: origin.is_meta_or_social,
+          is_meta_ads: origin.is_meta_ads,
+          campaign_label: origin.campaign_label,
           amount: Number(dealAmount.toFixed(2)),
           value: Number(dealPotential.toFixed(2)),
+          created_date: createdDateKey,
           won_date: wonDateKey,
+          cohort: cohortInfo.cohort,
+          days_to_close: cohortInfo.days_to_close,
         });
       }
     }
@@ -414,6 +468,18 @@ Deno.serve(async (req: Request) => {
       won_potential: Number(wonPotential.toFixed(2)),
       won_meta_deals: wonMetaDeals,
       won_meta_amount: Number(wonMetaAmount.toFixed(2)),
+      cohort_summary: {
+        same_period_deals: samePeriodDeals,
+        same_period_amount: Number(samePeriodAmount.toFixed(2)),
+        previous_period_deals: previousPeriodDeals,
+        previous_period_amount: Number(previousPeriodAmount.toFixed(2)),
+        meta_ads_deals: metaAdsDeals,
+        meta_ads_amount: Number(metaAdsAmount.toFixed(2)),
+        social_deals: socialDeals,
+        social_amount: Number(socialAmount.toFixed(2)),
+        other_deals: otherDeals,
+        other_amount: Number(otherAmount.toFixed(2)),
+      },
       won_items: wonItems,
       ai_cost_usd: aiCostUsd,
       ai_calls: (aiLogs || []).length,
