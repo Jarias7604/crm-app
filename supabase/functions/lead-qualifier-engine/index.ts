@@ -430,6 +430,7 @@ async function enqueueLeadWhatsApp(
     qualifierStatus: string;
     actorUserId?: string | null;
     existingTicketId?: string | null;
+    processedWaMessageId?: string | null;
   },
 ): Promise<{ ticketId: string | null; outboxId: string | null; metaPatch: Record<string, any> }> {
   const digits = normalizeWaDigits(input.lead?.phone);
@@ -461,12 +462,19 @@ async function enqueueLeadWhatsApp(
   }
 
   const nowIso = new Date().toISOString();
+  const cleanText = input.text.trim();
   const metaPatch = {
     ai_qualifier_enrolled: true,
     ai_qualifier_active: input.activeAfter,
     ai_qualifier_status: input.qualifierStatus,
     last_message_at: nowIso,
+    last_whatsapp_message: cleanText.slice(0, 200),
+    last_whatsapp_at: nowIso,
+    last_message_from: 'staff',
+    last_staff_reply_at: nowIso,
+    last_staff_reply_by: 'Calificador IA',
     whatsapp_message_count: Number(currentMeta.whatsapp_message_count || 0) + 1,
+    ...(input.processedWaMessageId ? { ai_qualifier_last_msg_id: input.processedWaMessageId } : {}),
   };
 
   let commentId: string | null = null;
@@ -810,6 +818,7 @@ async function callQualifierOpenAi(input: {
     '- Usa "offer_slots" e incluye las opciones numeradas 1, 2, 3 tal cual aparecen arriba cuando el lead ya esté interesado en ver el sistema.',
     '- Usa "book_demo" y coloca selected_slot_index (1, 2 o 3) SOLO cuando el prospecto haya elegido o confirmado uno de los horarios ofrecidos.',
     '- Usa "handoff_human" si pide hablar con una persona, pide llamada inmediata, pide contrato o muestra frustración.',
+    '- Si el mensaje parece un saludo automático de WhatsApp Business (ej. "Gracias por comunicarte con... ¿Cómo podemos ayudarte?"), responde breve en 1–2 líneas reiterando que le escribes por su registro reciente en Arias Defense sobre su punto de mejora y pregunta con quién coordinar la demo.',
     '- Mensaje breve, humano, máximo 4 líneas en WhatsApp.',
   ].join('\n');
 
@@ -996,6 +1005,7 @@ async function executeHandoff(
     summary: string;
     turnCount: number;
     sendWhatsAppReply: boolean;
+    waMessageId?: string | null;
   },
 ) {
   const picked = await pickAdvisorForLead(supabase, cfg.company_id, input.lead, true);
@@ -1024,6 +1034,7 @@ async function executeHandoff(
       activeAfter: false,
       qualifierStatus: 'handed_off',
       existingTicketId: input.ticketId,
+      processedWaMessageId: input.waMessageId || null,
     });
     ticketId = sent.ticketId;
     metaPatch = { ...sent.metaPatch, ...metaPatch };
@@ -1604,6 +1615,7 @@ async function enrollSingleLead(
     if (action === 'process_inbound_reply') {
       const leadId = String(payload?.lead_id || '').trim();
       const ticketId = String(payload?.ticket_id || '').trim() || null;
+      const waMessageId = String(payload?.wa_message_id || '').trim() || null;
       const incomingText = String(payload?.message_text || '').trim();
       if (!leadId || !incomingText) {
         return json({ ok: true, handled: false, reason: 'missing_lead_or_text' });
@@ -1612,14 +1624,20 @@ async function enrollSingleLead(
         return json({ ok: true, handled: false, reason: 'qualifier_disabled' });
       }
 
-      const [{ data: lead }, { data: session }] = await Promise.all([
+      const [{ data: lead }, { data: session }, ticketRes] = await Promise.all([
         supabase.from('leads').select('*').eq('company_id', companyId).eq('id', leadId).maybeSingle(),
         supabase.from('lead_qualifier_sessions').select('*').eq('company_id', companyId).eq('lead_id', leadId).maybeSingle(),
+        ticketId
+          ? supabase.from('tickets').select('id, metadata').eq('id', ticketId).maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
 
       if (!lead) return json({ ok: true, handled: false, reason: 'lead_not_found' });
-      if (session && ['paused', 'human_takeover', 'closed', 'max_turns'].includes(session.status)) {
+      if (session && ['paused', 'human_takeover', 'closed', 'closed_discarded', 'max_turns'].includes(session.status)) {
         return json({ ok: true, handled: false, reason: `session_${session.status}` });
+      }
+      if (waMessageId && ticketRes?.data?.metadata?.ai_qualifier_last_msg_id === waMessageId) {
+        return json({ ok: true, handled: false, reason: 'duplicate_wa_message_id' });
       }
 
       const now = new Date();
@@ -1654,13 +1672,20 @@ async function enrollSingleLead(
           summary: incomingText.slice(0, 180),
           turnCount: currentTurns,
           sendWhatsAppReply: true,
+          waMessageId,
         });
         await supabase
           .from('lead_qualifier_sessions')
           .update({ status: 'max_turns' })
           .eq('company_id', companyId)
           .eq('lead_id', leadId);
-        return json({ ok: true, handled: true, action: 'max_turns_handoff', ticket_meta_patch: handoff.metaPatch });
+        return json({
+          ok: true,
+          handled: true,
+          action: 'max_turns_handoff',
+          reply_text: handoff.replyMsg,
+          ticket_meta_patch: handoff.metaPatch,
+        });
       }
 
       // 1. Check explicit handoff keywords FIRST (deterministic zero-delay escalation)
@@ -1674,8 +1699,15 @@ async function enrollSingleLead(
           summary: `Mensaje del lead: "${incomingText.slice(0, 160)}"`,
           turnCount: currentTurns + 1,
           sendWhatsAppReply: true,
+          waMessageId,
         });
-        return json({ ok: true, handled: true, action: 'handoff_human', ticket_meta_patch: handoff.metaPatch });
+        return json({
+          ok: true,
+          handled: true,
+          action: 'handoff_human',
+          reply_text: handoff.replyMsg,
+          ticket_meta_patch: handoff.metaPatch,
+        });
       }
 
       const apiKey = await loadOpenAiKey(supabase, companyId);
@@ -1732,8 +1764,15 @@ async function enrollSingleLead(
           summary: aiOut.summary_for_advisor || incomingText.slice(0, 160),
           turnCount: currentTurns + 1,
           sendWhatsAppReply: true,
+          waMessageId,
         });
-        return json({ ok: true, handled: true, action: 'handoff_human', ticket_meta_patch: handoff.metaPatch });
+        return json({
+          ok: true,
+          handled: true,
+          action: 'handoff_human',
+          reply_text: handoff.replyMsg,
+          ticket_meta_patch: handoff.metaPatch,
+        });
       }
 
       if (aiOut.action === 'book_demo') {
@@ -1752,8 +1791,15 @@ async function enrollSingleLead(
             summary: aiOut.summary_for_advisor || incomingText.slice(0, 160),
             turnCount: currentTurns + 1,
             sendWhatsAppReply: true,
+            waMessageId,
           });
-          return json({ ok: true, handled: true, action: 'handoff_human', ticket_meta_patch: handoff.metaPatch });
+          return json({
+            ok: true,
+            handled: true,
+            action: 'handoff_human',
+            reply_text: handoff.replyMsg,
+            ticket_meta_patch: handoff.metaPatch,
+          });
         }
 
         const picked = pickedForSlots;
@@ -1787,6 +1833,7 @@ async function enrollSingleLead(
           activeAfter: false,
           qualifierStatus: 'demo_booked',
           existingTicketId: ticketId,
+          processedWaMessageId: waMessageId,
         });
 
         await supabase
@@ -1850,6 +1897,7 @@ async function enrollSingleLead(
           ok: true,
           handled: true,
           action: 'book_demo',
+          reply_text: confirmMsg,
           slot: chosenSlot,
           meet_link: meetLink,
           ticket_meta_patch: sent.metaPatch,
@@ -1865,6 +1913,7 @@ async function enrollSingleLead(
           activeAfter: false,
           qualifierStatus: 'closed',
           existingTicketId: ticketId,
+          processedWaMessageId: waMessageId,
         });
         await supabase.from('lead_qualifier_sessions').upsert(
           {
@@ -1879,7 +1928,13 @@ async function enrollSingleLead(
           },
           { onConflict: 'lead_id' },
         );
-        return json({ ok: true, handled: true, action: 'close_not_interested', ticket_meta_patch: sent.metaPatch });
+        return json({
+          ok: true,
+          handled: true,
+          action: 'close_not_interested',
+          reply_text: replyMsg,
+          ticket_meta_patch: sent.metaPatch,
+        });
       }
 
       // Standard continue or offer_slots turn
@@ -1897,6 +1952,7 @@ async function enrollSingleLead(
         activeAfter: true,
         qualifierStatus: 'active',
         existingTicketId: ticketId,
+        processedWaMessageId: waMessageId,
       });
 
       if (aiOut.detected_pain || aiOut.detected_volume) {
@@ -1923,7 +1979,13 @@ async function enrollSingleLead(
         { onConflict: 'lead_id' },
       );
 
-      return json({ ok: true, handled: true, action: aiOut.action, ticket_meta_patch: sent.metaPatch });
+      return json({
+        ok: true,
+        handled: true,
+        action: aiOut.action,
+        reply_text: replyText,
+        ticket_meta_patch: sent.metaPatch,
+      });
     }
 
     return json({ ok: false, error: `Acción desconocida: ${action}` }, 400);

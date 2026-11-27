@@ -679,3 +679,139 @@ test('14. Failed outbox filter, retryable error guard, and QR TTL countdown beha
   assert.equal(computeQrRemainingSeconds('2026-11-25T22:00:00.000Z', 55, baseMs + 60_000), 0);
   assert.equal(computeQrRemainingSeconds(null, 55, baseMs), 0);
 });
+
+test('15. shouldTriggerLeadQualifier & buildQualifierInvokeHeaders handle catchup, voice notes, and scopes', () => {
+  const { shouldTriggerLeadQualifier, buildQualifierInvokeHeaders, QUALIFIER_CATCHUP_MAX_AGE_MS } = loaded.aiHelpers;
+
+  // Live lead text reply -> triggers
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: false,
+      msgAgeMs: 2_000,
+      isStaff: false,
+      isGroup: false,
+      scope: 'lead',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-1',
+      messageText: 'Pero es para restaurante',
+    }),
+    true,
+  );
+
+  // Recent Watchdog catchup (< 15m) -> triggers
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: true,
+      msgAgeMs: 45_000,
+      isStaff: false,
+      isGroup: false,
+      scope: 'lead',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-1',
+      messageText: 'Hola sii pero no es Pae',
+    }),
+    true,
+  );
+
+  // Old historical catchup (> 15m) -> blocked
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: true,
+      msgAgeMs: QUALIFIER_CATCHUP_MAX_AGE_MS + 60_000,
+      isStaff: false,
+      isGroup: false,
+      scope: 'lead',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-1',
+      messageText: 'Mensaje viejo',
+    }),
+    false,
+  );
+
+  // Unassigned lead in por_clasificar with active qualifier & ticket.lead_id -> triggers
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: false,
+      msgAgeMs: 1_000,
+      isStaff: false,
+      isGroup: false,
+      scope: 'por_clasificar',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-unassigned',
+      messageText: 'Me interesa ver el sistema',
+    }),
+    true,
+  );
+
+  // Transcribed voice note -> triggers; non-audio media without caption -> blocked
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: false,
+      msgAgeMs: 5_000,
+      isStaff: false,
+      isGroup: false,
+      scope: 'lead',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-1',
+      messageText: '[Nota de voz del prospecto]: "Somos 3 sucursales"',
+      hasNonAudioMediaWithoutCaption: false,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: false,
+      msgAgeMs: 5_000,
+      isStaff: false,
+      isGroup: false,
+      scope: 'lead',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-1',
+      messageText: '',
+      hasNonAudioMediaWithoutCaption: true,
+    }),
+    false,
+  );
+
+  // Staff / Group / Inactive AI -> blocked
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: false,
+      msgAgeMs: 1_000,
+      isStaff: true,
+      isGroup: false,
+      scope: 'lead',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-1',
+      messageText: 'Hola',
+    }),
+    false,
+  );
+  assert.equal(
+    shouldTriggerLeadQualifier({
+      isCatchup: false,
+      msgAgeMs: 1_000,
+      isStaff: false,
+      isGroup: true,
+      scope: 'lead',
+      aiQualifierActive: true,
+      effectiveLeadId: 'lead-1',
+      messageText: 'Hola',
+    }),
+    false,
+  );
+
+  // Headers include both x-sheets-sync-secret and Bearer/apikey when available
+  assert.deepEqual(buildQualifierInvokeHeaders('sync-123', 'srv-456'), {
+    'Content-Type': 'application/json',
+    'x-sheets-sync-secret': 'sync-123',
+    Authorization: 'Bearer srv-456',
+    apikey: 'srv-456',
+  });
+  assert.deepEqual(buildQualifierInvokeHeaders('', 'srv-only'), {
+    'Content-Type': 'application/json',
+    'x-sheets-sync-secret': 'srv-only',
+    Authorization: 'Bearer srv-only',
+    apikey: 'srv-only',
+  });
+});

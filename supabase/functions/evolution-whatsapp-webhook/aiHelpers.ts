@@ -258,3 +258,53 @@ export async function transcribeAudio(openAiKey: string, bytes: Uint8Array, mime
     return '';
   }
 }
+
+export const QUALIFIER_CATCHUP_MAX_AGE_MS = 15 * 60 * 1000;
+
+export interface QualifierTriggerInput {
+  isCatchup: boolean;
+  msgAgeMs: number;
+  isStaff: boolean;
+  isGroup: boolean;
+  scope: string;
+  aiQualifierActive: boolean;
+  effectiveLeadId: string | null;
+  messageText: string;
+  hasNonAudioMediaWithoutCaption?: boolean;
+}
+
+export function shouldTriggerLeadQualifier(input: QualifierTriggerInput): boolean {
+  if (input.isStaff || input.isGroup || !input.aiQualifierActive || !input.effectiveLeadId) {
+    return false;
+  }
+  if (!['lead', 'por_clasificar'].includes(String(input.scope || ''))) {
+    return false;
+  }
+  if (input.isCatchup) {
+    if (!Number.isFinite(input.msgAgeMs) || input.msgAgeMs > QUALIFIER_CATCHUP_MAX_AGE_MS || input.msgAgeMs < -5 * 60 * 1000) {
+      return false;
+    }
+  }
+  if (input.hasNonAudioMediaWithoutCaption) {
+    return false;
+  }
+  return Boolean(String(input.messageText || '').trim());
+}
+
+export function buildQualifierInvokeHeaders(
+  syncSecret?: string | null,
+  serviceKey?: string | null,
+): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const cleanSecret = String(syncSecret || '').trim();
+  const cleanService = String(serviceKey || '').trim();
+  const effectiveSecret = cleanSecret || cleanService;
+  if (effectiveSecret) {
+    headers['x-sheets-sync-secret'] = effectiveSecret;
+  }
+  if (cleanService) {
+    headers.Authorization = `Bearer ${cleanService}`;
+    headers.apikey = cleanService;
+  }
+  return headers;
+}

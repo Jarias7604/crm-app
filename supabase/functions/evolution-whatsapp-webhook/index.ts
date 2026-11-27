@@ -67,6 +67,8 @@ import {
   askOpenAiTechnicalClassifier,
   askOpenAi,
   transcribeAudio,
+  shouldTriggerLeadQualifier,
+  buildQualifierInvokeHeaders,
 } from './aiHelpers.ts';
 import {
   unwrapMessage,
@@ -990,6 +992,101 @@ async function handleSetQualifierThreadState(supabase: any, caller: Caller, payl
   return json({ ok: true, active, status: active ? 'active' : 'paused', ticket_id: ticket.id });
 }
 
+async function invokeLeadQualifierReply(params: {
+  companyId: string;
+  leadId: string;
+  ticketId: string;
+  messageText: string;
+  senderPhone: string;
+  waMessageId?: string | null;
+}): Promise<{
+  handled: boolean;
+  replyText?: string | null;
+  ticketMetaPatch?: Record<string, any> | null;
+  diag: Record<string, any>;
+}> {
+  const qualBaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
+  const syncSecret = (Deno.env.get('SHEETS_SYNC_SECRET') || '').trim();
+  const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '').trim();
+  const at = new Date().toISOString();
+
+  if (!qualBaseUrl.startsWith('http') || (!syncSecret && !serviceKey)) {
+    const diag = { at, ok: false, status: 0, reason: 'missing_env_or_secret', error: null };
+    console.warn('[evolution-whatsapp-webhook] lead-qualifier-engine skipped:', diag.reason);
+    return { handled: false, diag };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 22000);
+  try {
+    const resp = await fetch(`${qualBaseUrl}/functions/v1/lead-qualifier-engine`, {
+      method: 'POST',
+      headers: buildQualifierInvokeHeaders(syncSecret, serviceKey),
+      signal: controller.signal,
+      body: JSON.stringify({
+        action: 'process_inbound_reply',
+        company_id: params.companyId,
+        lead_id: params.leadId,
+        ticket_id: params.ticketId,
+        message_text: params.messageText,
+        sender_phone: params.senderPhone,
+        wa_message_id: params.waMessageId || null,
+      }),
+    });
+
+    const rawBody = await resp.text().catch(() => '');
+    let parsed: any = null;
+    try {
+      parsed = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      parsed = null;
+    }
+
+    if (!resp.ok) {
+      const diag = {
+        at,
+        ok: false,
+        status: resp.status,
+        reason: parsed?.reason || parsed?.error || 'http_error',
+        error: rawBody.slice(0, 200) || `HTTP ${resp.status}`,
+      };
+      console.warn('[evolution-whatsapp-webhook] lead-qualifier-engine HTTP error:', diag);
+      return { handled: false, diag };
+    }
+
+    const handled = parsed?.handled === true;
+    const diag = {
+      at,
+      ok: handled,
+      status: resp.status,
+      reason: parsed?.reason || parsed?.action || (handled ? 'handled' : 'not_handled'),
+      error: parsed?.error || null,
+    };
+    if (!handled) {
+      console.warn('[evolution-whatsapp-webhook] lead-qualifier-engine not handled:', diag);
+    }
+    return {
+      handled,
+      replyText: typeof parsed?.reply_text === 'string' ? parsed.reply_text : null,
+      ticketMetaPatch: parsed?.ticket_meta_patch && typeof parsed.ticket_meta_patch === 'object' ? parsed.ticket_meta_patch : null,
+      diag,
+    };
+  } catch (err: any) {
+    const isAbort = err?.name === 'AbortError' || /abort/i.test(String(err?.message || ''));
+    const diag = {
+      at,
+      ok: false,
+      status: 0,
+      reason: isAbort ? 'timeout_22s' : 'network_exception',
+      error: String(err?.message || err).slice(0, 200),
+    };
+    console.warn('[evolution-whatsapp-webhook] lead-qualifier-engine error:', diag);
+    return { handled: false, diag };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // =============================================================================
 // Inbound message
 // =============================================================================
@@ -1465,10 +1562,34 @@ async function ingestWhatsAppEntry(
     .single();
   if (comment?.id) await supabase.from('whatsapp_messages').update({ comment_id: comment.id }).eq('id', waRowId);
 
-  // Inline media (Evolution "webhook base64" option) — store right away.
+  // Inline media (Evolution "webhook base64" option) — store right away + transcribe audio for AI Qualifier.
   const inlineB64: string = entry?.message?.base64 || entry?.base64 || payload?.data?.message?.base64 || '';
+  let inlineAudioTranscript = '';
   if (media && inlineB64 && waRowId) {
-    await storeMediaBytes(supabase, waRowId, inlineB64, media.obj?.mimetype || '', media.obj?.fileName || '');
+    const storedInline = await storeMediaBytes(supabase, waRowId, inlineB64, media.obj?.mimetype || '', media.obj?.fileName || '');
+    if (
+      storedInline.ok &&
+      storedInline.bytes &&
+      media.kind === 'audio' &&
+      !fromMe &&
+      !isStaff &&
+      Date.now() - msgDate.getTime() < 15 * 60 * 1000
+    ) {
+      const aiCfg = await getAiCfg();
+      if (aiCfg.openAiKey) {
+        const transcript = await transcribeAudio(aiCfg.openAiKey, storedInline.bytes, storedInline.mime || 'audio/ogg');
+        if (transcript) {
+          inlineAudioTranscript = transcript;
+          if (comment?.id) {
+            await supabase
+              .from('ticket_comments')
+              .update({ body: `${line}\n📝 Transcripción IA: "${transcript}"` })
+              .eq('id', comment.id);
+          }
+          await supabase.from('whatsapp_messages').update({ body: transcript }).eq('id', waRowId);
+        }
+      }
+    }
   }
 
   // ── Update the ticket ──
@@ -1534,53 +1655,48 @@ async function ingestWhatsAppEntry(
   let autoResolvedMetaPatch: Record<string, any> = {};
 
   // Dedicated Sales Lead Qualifier AI route (only when this lead chat was enrolled & active)
+  const effectiveLeadId = scopeInfo.leadId || targetTicket.lead_id || null;
+  const qualifierMessageText = inlineAudioTranscript
+    ? `[Nota de voz del prospecto]: "${inlineAudioTranscript}"`
+    : text;
+  const msgAgeMs = Date.now() - msgDate.getTime();
+  const alreadyProcessedByQualifier = Boolean(waMessageId && currentMeta.ai_qualifier_last_msg_id === waMessageId);
+
   if (
-    !isCatchup &&
-    !isStaff &&
-    !isGroup &&
-    !media &&
-    scope === 'lead' &&
-    Boolean(scopeInfo.leadId) &&
-    currentMeta.ai_qualifier_active === true &&
-    displayText
+    !alreadyProcessedByQualifier &&
+    shouldTriggerLeadQualifier({
+      isCatchup,
+      msgAgeMs,
+      isStaff,
+      isGroup,
+      scope,
+      aiQualifierActive: currentMeta.ai_qualifier_active === true,
+      effectiveLeadId,
+      messageText: qualifierMessageText,
+      hasNonAudioMediaWithoutCaption: Boolean(media && media.kind !== 'audio' && !text),
+    })
   ) {
-    try {
-      const qualBaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
-      const qualSecret = Deno.env.get('SHEETS_SYNC_SECRET') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-      if (qualBaseUrl.startsWith('http') && qualSecret) {
-        const qualResp = await Promise.race([
-          fetch(`${qualBaseUrl}/functions/v1/lead-qualifier-engine`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-sheets-sync-secret': qualSecret,
-            },
-            body: JSON.stringify({
-              action: 'process_inbound_reply',
-              company_id: companyId,
-              lead_id: scopeInfo.leadId,
-              ticket_id: targetTicket.id,
-              message_text: displayText,
-              sender_phone: senderPhone || chatPhone || '',
-              wa_message_id: waMessageId || null,
-            }),
-          }),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 9000)),
-        ]);
-        if (qualResp && 'ok' in qualResp && qualResp.ok) {
-          const qualJson = await qualResp.json().catch(() => null);
-          if (qualJson?.handled === true) {
-            aiReplied = true;
-            aiReplyAuthor = 'Calificador IA';
-            if (qualJson.ticket_meta_patch && typeof qualJson.ticket_meta_patch === 'object') {
-              Object.assign(autoResolvedMetaPatch, qualJson.ticket_meta_patch);
-              Object.assign(currentMeta, qualJson.ticket_meta_patch);
-            }
-          }
-        }
+    const qualResult = await invokeLeadQualifierReply({
+      companyId,
+      leadId: effectiveLeadId!,
+      ticketId: targetTicket.id,
+      messageText: qualifierMessageText,
+      senderPhone: senderPhone || chatPhone || '',
+      waMessageId,
+    });
+    autoResolvedMetaPatch.ai_qualifier_last_diag = qualResult.diag;
+    if (qualResult.handled) {
+      aiReplied = true;
+      aiReplyAuthor = 'Calificador IA';
+      if (qualResult.ticketMetaPatch) {
+        Object.assign(autoResolvedMetaPatch, qualResult.ticketMetaPatch);
+        Object.assign(currentMeta, qualResult.ticketMetaPatch);
       }
-    } catch (qualErr: any) {
-      console.warn('[evolution-whatsapp-webhook] lead-qualifier-engine error:', qualErr?.message || qualErr);
+      if (qualResult.replyText) {
+        const qualLine = `[${fmtTime(new Date())}] 👨‍💻 Calificador IA: ${qualResult.replyText.trim()}`;
+        description = `${description}\n${qualLine}`;
+        lastPreview = qualResult.replyText.trim().slice(0, 200);
+      }
     }
   }
 
@@ -1702,7 +1818,7 @@ async function ingestWhatsAppEntry(
       ...(nextIsTechTicket !== undefined ? { is_technical_ticket: nextIsTechTicket } : {}),
       awaiting_problem_details: scope === 'soporte' ? !(nextIsTechTicket === true) : false,
       support_channel: scope === 'soporte' ? (classification.supportChannel !== 'soporte' && classification.supportChannel !== 'ventas' && !isStaff ? classification.supportChannel : currentMeta.support_channel === 'ventas' ? 'soporte' : currentMeta.support_channel || 'soporte') : 'ventas',
-      whatsapp_message_count: Number(currentMeta.whatsapp_message_count || 0) + 1 + (aiReplied ? 1 : 0),
+      whatsapp_message_count: Number(currentMeta.whatsapp_message_count || 0) + 1 + (aiReplied && aiReplyAuthor !== 'Calificador IA' ? 1 : 0),
       last_whatsapp_message: isNewerOrEqual ? lastPreview : currentMeta.last_whatsapp_message,
       last_whatsapp_at: isNewerOrEqual ? msgDate.toISOString() : prevLastIso,
       last_message_from: isNewerOrEqual ? (aiReplied || isStaff ? 'staff' : 'client') : currentMeta.last_message_from,
@@ -1832,10 +1948,10 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
   const stored = await storeMediaBytes(supabase, waMsgId, b64, payload?.mimetype || payload?.data?.mimetype || '', payload?.fileName || payload?.data?.fileName || '');
   if (!stored.ok) return json({ ok: false, error: stored.error });
 
-  // Voice notes: transcription (+ optional AI voice reply).
+  // Voice notes: transcription (+ Sales Lead Qualifier AI or optional legacy AI voice reply).
   const { data: row } = await supabase
     .from('whatsapp_messages')
-    .select('id, company_id, ticket_id, comment_id, message_type, from_me, message_ts')
+    .select('id, company_id, ticket_id, comment_id, wa_message_id, sender_phone, message_type, from_me, message_ts')
     .eq('id', waMsgId)
     .maybeSingle();
   // Historical media (imported from the chat history) never triggers an automatic reply.
@@ -1854,9 +1970,56 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
       const { data: t } = await supabase.from('tickets').select('*').eq('id', row.ticket_id).maybeSingle();
       let meta = cleanMeta(t?.metadata || {});
       const scope = String(meta.wa_scope || 'soporte') as WaScope;
+
+      let handledByQualifier = false;
+      const effectiveLeadId = t?.lead_id || null;
+      const alreadyProcessedVoice = Boolean(row.wa_message_id && meta.ai_qualifier_last_msg_id === row.wa_message_id);
+      if (
+        t &&
+        !alreadyProcessedVoice &&
+        shouldTriggerLeadQualifier({
+          isCatchup: !isRecentMsg,
+          msgAgeMs: row.message_ts ? Date.now() - new Date(row.message_ts).getTime() : 0,
+          isStaff: false,
+          isGroup: meta.is_group === true || String(meta.whatsapp_jid || '').endsWith('@g.us'),
+          scope,
+          aiQualifierActive: meta.ai_qualifier_active === true,
+          effectiveLeadId,
+          messageText: transcript ? `[Nota de voz del prospecto]: "${transcript}"` : '',
+        })
+      ) {
+        const qualRes = await invokeLeadQualifierReply({
+          companyId: t.company_id || row.company_id,
+          leadId: effectiveLeadId!,
+          ticketId: t.id,
+          messageText: `[Nota de voz del prospecto]: "${transcript}"`,
+          senderPhone: row.sender_phone || meta.whatsapp_phone || '',
+          waMessageId: row.wa_message_id || null,
+        });
+        const nextMeta: Record<string, any> = {
+          ...meta,
+          ai_qualifier_last_diag: qualRes.diag,
+          ...(qualRes.ticketMetaPatch || {}),
+        };
+        if (qualRes.handled) {
+          handledByQualifier = true;
+          const patchUpdate: Record<string, any> = {
+            metadata: nextMeta,
+            updated_at: new Date().toISOString(),
+          };
+          if (qualRes.replyText) {
+            const qualLine = `[${fmtTime(new Date())}] 👨‍💻 Calificador IA: ${qualRes.replyText.trim()}`;
+            patchUpdate.description = `${String(t.description || '')}\n${qualLine}`;
+          }
+          await supabase.from('tickets').update(patchUpdate).eq('id', t.id);
+        } else {
+          await supabase.from('tickets').update({ metadata: nextMeta }).eq('id', t.id);
+        }
+      }
+
       // Voice transcripts are saved in chat history & reply context, without
       // auto-promoting chats into technical tickets.
-      if (t && isRecentMsg && aiCfg.autoReplyAudio && meta.ai_auto_reply_enabled !== false && ['soporte', 'lead', 'por_clasificar'].includes(scope)) {
+      if (!handledByQualifier && t && isRecentMsg && aiCfg.autoReplyAudio && meta.ai_auto_reply_enabled !== false && ['soporte', 'lead', 'por_clasificar'].includes(scope)) {
         const ch: SupportChannelType = scope === 'soporte' ? (meta.support_channel as SupportChannelType) || 'soporte' : 'ventas';
         const reply = await askOpenAi(
           aiCfg.openAiKey,

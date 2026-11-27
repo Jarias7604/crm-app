@@ -4,10 +4,10 @@ import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const WORKSPACE = process.cwd();
-const SCRATCH_SHOTS = 'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch/screenshots';
+const SCRATCH_SHOTS = 'C:/Users/jaria/.gemini/antigravity/brain/f6e136e3-8fd0-4b66-a458-78558685f5ef/scratch/screenshots_f23';
 const OUT_PDF = path.join(WORKSPACE, 'docs', 'SOP_Fase2_y_3_Calificador_IA_Demos_Notificaciones_CRM.pdf');
 const TMP_HTML = path.join(
-  'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch',
+  'C:/Users/jaria/.gemini/antigravity/brain/f6e136e3-8fd0-4b66-a458-78558685f5ef/scratch',
   'sop_fases2_3.html'
 );
 
@@ -201,7 +201,7 @@ const hdr = (code = 'SOP-COM-2026-03 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Gestión comercial / Versión 1.2 · Calificador IA, Cola Sheets y Sincronización Bidireccional</span>
+    <span>Gestión comercial / Versión 1.3 · Calificador IA (Turnos 2–6, Voz Whisper, Watchdog) y Sincronización</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -219,8 +219,8 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <div class="kicker" style="margin-top:22px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-03</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.2 · Fases 2 y 3 + Cola Sheets + Sincronización Chat ⇄ Lead</td></tr>
-        <tr><td class="kv-key">Vigencia</td><td class="kv-val">Noviembre 2026</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.3 · Fases 2 y 3 + Continuidad Turnos 2–6 (Watchdog/Voz Whisper) + Sincronización</td></tr>
+        <tr><td class="kv-key">Vigencia</td><td class="kv-val">27 de noviembre de 2026</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">SaaS Multi-Empresa (aislado de Soporte Técnico)</td></tr>
         <tr><td class="kv-key">Estado inicial seguro</td><td class="kv-val">Motor APAGADO (is_enabled = false) · Modo Borrador</td></tr>
       </table>
@@ -303,7 +303,8 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
         <tr><th style="width:28%;">Regla de seguridad</th><th style="width:72%;">Comportamiento garantizado en producción</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Sin riesgo en chats actuales</strong></td><td>El webhook solo ejecuta el calificador cuando el chat tiene <code>wa_scope = 'lead'</code> y <code>ai_qualifier_active = true</code>. Grupos y clientes de soporte siguen intactos.</td></tr>
+        <tr><td><strong>Sin riesgo en chats actuales</strong></td><td>El webhook solo ejecuta el calificador cuando <code>ai_qualifier_active = true</code> y el hilo es <code>lead</code> o <code>por_clasificar</code> con <code>lead_id</code> vinculado. Grupos y clientes de soporte siguen intactos.</td></tr>
+        <tr><td><strong>Continuidad Turnos 2–6 y Voz</strong></td><td>Atiende también mensajes recientes recuperados por Watchdog (&lt; 15 min), notas de voz transcritas con Whisper y autorespuestas de WhatsApp Business (timeout 22s + deduplicación <code>wa_message_id</code>).</td></tr>
         <tr><td><strong>Human Takeover automático</strong></td><td>Si un asesor contesta desde el CRM o desde el teléfono conectado, el bot se pausa al instante (<code>human_takeover</code>).</td></tr>
       </tbody>
     </table>
@@ -494,8 +495,8 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     </div>
     <div class="fig-cap">Figura 6. Pantalla real de WhatsApp CRM con indicadores por hilo comercial y barra de control humano instantáneo.</div>
 
-    <h3 class="sub-h">Comportamiento ante intervención humana</h3>
-    <p class="body-p">Al hacer clic en <strong>Pausar IA aquí</strong> o enviar cualquier texto/archivo manual, el ticket cambia internamente a <code>human_takeover</code> o <code>paused</code>, protegiendo al cliente contra respuestas cruzadas entre el bot y el vendedor.</p>
+    <h3 class="sub-h">Comportamiento ante intervención humana y continuidad garantizada (v1.3)</h3>
+    <p class="body-p">Al hacer clic en <strong>Pausar IA aquí</strong> o enviar cualquier texto/archivo manual, el ticket cambia internamente a <code>human_takeover</code> o <code>paused</code>, protegiendo al cliente contra respuestas cruzadas entre el bot y el vendedor. Mientras la IA siga activa, procesa respuestas de texto, mensajes recientes rescatados por Watchdog (&lt; 15 min), saludos automáticos de WhatsApp Business y notas de voz transcritas por Whisper, registrando su última traza en <code>ai_qualifier_last_diag</code>.</p>
   </div>
   ${ftr(8, 10)}
 </section>
@@ -559,7 +560,8 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.2 / Nov. 2026</td><td>Agrega sincronización bidireccional Chat WhatsApp ⇄ Lead Discovery (SSOT trigger PostgreSQL, marcado automático Erróneo y pausa automática IA) con capturas reales.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.3 / 27 Nov. 2026</td><td>Continuidad garantizada Turnos 2–6: soporte a mensajes recientes rescatados por Watchdog (&lt;15m), notas de voz vía Whisper, manejo de autorespuestas WhatsApp Business, timeout 22s, deduplicación por <code>wa_message_id</code> y traza <code>ai_qualifier_last_diag</code>.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.2 / Nov. 2026</td><td>Agrega sincronización bidireccional Chat WhatsApp ⇄ Lead Discovery (SSOT trigger PostgreSQL, marcado automático Erróneo y pausa automática IA) con capturas reales.</td><td>Versión previa</td></tr>
         <tr><td>1.1 / Nov. 2026</td><td>Incorpora Cola por Lote de Google Sheets (filtro Hoy/7d/Todos y botón Activar IA para Seleccionados) con captura real actualizada.</td><td>Versión previa</td></tr>
         <tr><td>1.0 / Nov. 2026</td><td>SOP oficial Fases 2 y 3 con capturas reales del entorno CRM y trazabilidad visual.</td><td>Versión base</td></tr>
       </tbody>
