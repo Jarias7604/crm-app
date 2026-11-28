@@ -154,6 +154,13 @@ function PremiumSelect({
 export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, teamMembers, industries, onSubmit, followUpTime, setFollowUpTime, products, loadProducts }: CreateLeadFullscreenProps) {
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
 
+    useEffect(() => {
+        window.dispatchEvent(new CustomEvent('arias:mobile-overlay-open', { detail: isOpen }));
+        return () => {
+            window.dispatchEvent(new CustomEvent('arias:mobile-overlay-open', { detail: false }));
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -176,13 +183,13 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
         icon: '👤',
     }));
 
-    return (
-        <div className="fixed inset-0 z-[200] animate-in fade-in duration-200">
-            {/* Overlay: transparent on mobile, dark on desktop */}
+    return createPortal(
+        <div className="fixed inset-0 z-[220] h-[100dvh]">
+            {/* Overlay: opaque white on mobile, blurred dark on desktop */}
             <div className="absolute inset-0 bg-white md:bg-black/50 md:backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} />
 
-            {/* Container: fullscreen mobile | centered modal desktop */}
-            <div className="relative h-full md:h-auto md:max-h-[95vh] md:max-w-[920px] md:mx-auto md:mt-[2.5vh] bg-white md:rounded-2xl md:shadow-2xl flex flex-col overflow-hidden">
+            {/* Container: exact dynamic viewport height on mobile | centered modal on desktop */}
+            <div className="relative h-[100dvh] md:h-auto md:max-h-[95vh] md:max-w-[920px] md:mx-auto md:mt-[2.5vh] bg-white md:rounded-2xl md:shadow-2xl flex flex-col overflow-hidden">
 
                 {/* ═══ Header ═══ */}
                 <div className="h-14 bg-gradient-to-r from-indigo-600 to-blue-600 flex items-center justify-between px-5 shrink-0">
@@ -201,8 +208,8 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                     </button>
                 </div>
 
-                <form onSubmit={onSubmit} className="flex-1 flex flex-col overflow-hidden">
-                    <div className="flex-1 overflow-y-auto">
+                <form onSubmit={onSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-28 md:pb-6">
 
                         {/* ═══════════════════════════════════════════ */}
                         {/* STEP 1: ¿QUIÉN ES? — Lo más importante     */}
@@ -511,18 +518,18 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                     </div>
 
                     {/* ═══ Footer ═══ */}
-                    <div className="px-5 md:px-8 py-4 bg-gray-50 border-t border-gray-100 shrink-0">
+                    <div className="px-5 md:px-8 pt-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-gray-200/80 shadow-[0_-6px_20px_rgba(15,23,42,0.06)] shrink-0">
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-6 h-11 rounded-xl border-2 border-gray-200 text-gray-500 font-bold text-sm hover:bg-gray-100 transition-all hidden md:block"
+                                className="px-6 h-12 rounded-xl border-2 border-gray-200 text-gray-500 font-bold text-sm hover:bg-gray-100 transition-all hidden md:block"
                             >
                                 Cancelar
                             </button>
                             <button
                                 type="submit"
-                                className="flex-1 h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                className="flex-1 h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                             >
                                 <Plus className="w-4 h-4" />
                                 CREAR PROSPECTO
@@ -536,6 +543,7 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                 onClose={() => setIsManageModalOpen(false)}
                 onProductsChanged={loadProducts}
             />
-        </div>
+        </div>,
+        document.body
     );
 }

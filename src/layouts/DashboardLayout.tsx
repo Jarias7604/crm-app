@@ -37,6 +37,9 @@ export default function DashboardLayout() {
     // NOTE: Only ChatHub needs the locked h-screen/overflow-hidden layout.
     // CotizacionDetalle has its own sticky header and needs free scroll — do NOT include it here.
     const isImmersiveView = location.pathname === '/marketing/chat' || location.pathname === '/support/chat';
+    const isFocusedQuoteWizard =
+        location.pathname.startsWith('/cotizaciones/nueva') ||
+        /^\/cotizaciones\/[^/]+\/editar(\/|$)/.test(location.pathname);
     const isFullWidthView = location.pathname.startsWith('/marketing/campaign') || location.pathname.startsWith('/marketing/email');
 
     // Initialize session timeout
@@ -59,8 +62,10 @@ export default function DashboardLayout() {
                 isImmersiveView
                     ? mobileChatFullscreen
                         ? "min-h-[100dvh] pb-0 lg:h-[100dvh] lg:overflow-hidden lg:pb-0"
-                        : "min-h-[100dvh] pb-20 lg:h-[100dvh] lg:overflow-hidden lg:pb-0"
-                    : "min-h-screen pb-20 md:pb-0",
+                        : "min-h-[100dvh] pb-36 lg:h-[100dvh] lg:overflow-hidden lg:pb-0"
+                    : isFocusedQuoteWizard
+                        ? "min-h-screen pb-0 md:pb-0"
+                        : "min-h-screen pb-[calc(10rem+env(safe-area-inset-bottom))] md:pb-0",
                 sidebarCollapsed ? "md:pl-20" : "md:pl-64"
             )}>
                 {/* Optimized Global Header - Hidden on Quote Detail & Chat for immersion */}

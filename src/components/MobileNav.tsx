@@ -10,11 +10,17 @@ export default function MobileNav() {
     const { t } = useTranslation();
     const [showActionSheet, setShowActionSheet] = useState(false);
     const [mobileChatOpen, setMobileChatOpen] = useState(false);
+    const [mobileOverlayOpen, setMobileOverlayOpen] = useState(false);
+
+    const isFocusedQuoteWizard =
+        location.pathname.startsWith('/cotizaciones/nueva') ||
+        /^\/cotizaciones\/[^/]+\/editar(\/|$)/.test(location.pathname);
 
     useEffect(() => {
         if (!location.pathname.startsWith('/support/chat')) {
             setMobileChatOpen(false);
         }
+        setMobileOverlayOpen(false);
     }, [location.pathname]);
 
     useEffect(() => {
@@ -26,7 +32,16 @@ export default function MobileNav() {
         return () => window.removeEventListener('arias:mobile-chat-open', handler);
     }, []);
 
-    if (mobileChatOpen && location.pathname.startsWith('/support/chat')) {
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<boolean>).detail;
+            setMobileOverlayOpen(Boolean(detail));
+        };
+        window.addEventListener('arias:mobile-overlay-open', handler);
+        return () => window.removeEventListener('arias:mobile-overlay-open', handler);
+    }, []);
+
+    if ((mobileChatOpen && location.pathname.startsWith('/support/chat')) || isFocusedQuoteWizard || mobileOverlayOpen) {
         return null;
     }
 
@@ -134,7 +149,7 @@ export default function MobileNav() {
 
             {/* ── Bottom Navigation Bar (iOS 26 Liquid Glass Floating Dock) ── */}
             <div
-                className="md:hidden fixed bottom-0 left-0 right-0 z-[100] px-3 pointer-events-none"
+                className="md:hidden fixed bottom-0 left-0 right-0 z-40 px-3 pointer-events-none"
                 style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
             >
                 <nav

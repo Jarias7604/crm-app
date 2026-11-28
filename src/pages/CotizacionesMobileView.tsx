@@ -198,7 +198,7 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
             </div>
 
             {/* ── Quotes List ───────────────────────────────────── */}
-            <div className="flex-1 px-4 pb-32 space-y-3">
+            <div className="flex-1 px-4 pb-48 space-y-3">
 
                 {loading && (
                     <div className="space-y-3 pt-2">
@@ -282,7 +282,7 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
             </div>
 
             {/* ── FAB ──────────────────────────────────────────── */}
-            <div className="fixed bottom-24 right-4 z-30">
+            <div className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-4 z-30">
                 <button
                     onClick={() => navigate('/cotizaciones/nueva-pro')}
                     className="flex items-center gap-2 bg-[#4449AA] text-white pl-5 pr-6 py-4 rounded-2xl shadow-xl shadow-[#4449AA]/40 active:scale-95 transition-transform font-black text-xs uppercase tracking-widest"

@@ -895,14 +895,14 @@ export default function CotizadorPro() {
 
     return (
         <>
-            <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-32 sm:pb-6">
+            <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-48 md:pb-10">
                 {/* Header — compact on mobile */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h1 className="text-lg sm:text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización</h1>
                         <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Sistema de cotización profesional — Servicios, Productos y Paquetes</p>
                     </div>
-                    {location.state?.fromWaChat && (
+                    {location.state?.fromWaChat ? (
                         <button
                             type="button"
                             onClick={() =>
@@ -915,6 +915,15 @@ export default function CotizadorPro() {
                         >
                             <ArrowLeft className="w-3.5 h-3.5" />
                             <span>Volver al chat de WhatsApp{formData.cliente_nombre ? ` · ${formData.cliente_nombre}` : ''}</span>
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => navigate(-1)}
+                            className="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Volver</span>
                         </button>
                     )}
                 </div>
@@ -2364,7 +2373,7 @@ export default function CotizadorPro() {
                     )}
 
                     {/* ── Navigation Buttons — Desktop ── */}
-                    <div className="hidden sm:flex justify-between mt-8">
+                    <div className="hidden md:flex justify-between mt-8">
                         <Button
                             onClick={handleAnterior}
                             variant="outline"
@@ -2517,14 +2526,14 @@ export default function CotizadorPro() {
                     )
                 }
             </div>
-            {/* ── Mobile Sticky Action Bar ── */}
-            <div className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-40">
-                <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl shadow-xl shadow-black/10 p-3 flex gap-3">
+            {/* ── Mobile Sticky Action Bar (Focused Wizard — bottom-0 without dock collision) ── */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pt-3 pb-[max(0.9rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-xl border-t border-slate-200/80 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+                <div className="flex gap-3">
                     {/* Back button — hidden on step 1 */}
                     {pasoActual > 1 && (
                         <button
                             onClick={handleAnterior}
-                            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-sm active:scale-95 transition-transform hover:border-gray-300"
+                            className="h-12 flex items-center justify-center gap-2 px-5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-sm active:scale-95 transition-transform hover:border-gray-300"
                         >
                             <ArrowLeft className="w-4 h-4 flex-shrink-0" />
                             Atrás
@@ -2535,7 +2544,7 @@ export default function CotizadorPro() {
                     {pasoActual < 4 ? (
                         <button
                             onClick={handleSiguiente}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#4449AA] text-white font-bold text-sm shadow-md shadow-[#4449AA]/30 active:scale-95 transition-all"
+                            className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-[#4449AA] text-white font-bold text-sm shadow-md shadow-[#4449AA]/30 active:scale-95 transition-all"
                         >
                             Siguiente
                             <ArrowRight className="w-4 h-4 flex-shrink-0" />
@@ -2543,7 +2552,7 @@ export default function CotizadorPro() {
                     ) : (
                         <button
                             onClick={handleGenerar}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 text-white font-bold text-sm shadow-md shadow-green-600/30 active:scale-95 transition-all"
+                            className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-green-600 text-white font-bold text-sm shadow-md shadow-green-600/30 active:scale-95 transition-all"
                         >
                             <Receipt className="w-4 h-4 flex-shrink-0" />
                             {location.state?.fromWaChat ? 'Generar y volver al chat' : 'Generar Cotización'}
