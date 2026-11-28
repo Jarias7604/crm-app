@@ -451,7 +451,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.8 / 27 Nov. 2026</td><td>Unifica el <strong>Selector Moderno de Marca y Páginas Estilo Metricool</strong> como único selector en la barra superior de <strong>Calendario, Lista y Estadísticas &amp; Ads</strong> (eliminando el selector duplicado de Analytics; agrupa las 5 marcas con avatar, íconos y filtros por página en 1 clic), moderniza <em>Filtros</em> y añade presentación nativa Bottom Sheet iOS en celular (393×852).</td><td>Vigente en producción</td></tr>
+        <tr><td>1.8 / 27 Nov. 2026</td><td>Unifica el <strong>Selector Moderno de Marca y Páginas Estilo Metricool</strong> como único selector en la barra superior de <strong>Calendario, Lista y Estadísticas &amp; Ads</strong> (sin duplicado), alinea en <strong>una sola línea ejecutiva</strong> la gráfica <em>Inversión vs Ganado</em> + <em>Cohorte</em> + <em>Embudo Ads → CRM</em> (<code>6 + 3 + 3</code> cols.), moderniza <em>Filtros</em> y añade Bottom Sheet iOS en celular (393×852).</td><td>Vigente en producción</td></tr>
         <tr><td>1.7 / 27 Nov. 2026</td><td>Reemplaza el menú desplegable nativo en <em>Estadísticas &amp; Ads</em> por un <strong>Selector Moderno de Marca y Cuentas Estilo Metricool</strong> con avatar de marca, íconos vectoriales (Meta Ads, Facebook, Instagram, YouTube), listado de páginas conectadas y píldora superior multi-red diferenciada.</td><td>Superada por v1.8</td></tr>
         <tr><td>1.6 / 27 Nov. 2026</td><td>Rediseño limpio estilo Metricool en 3 sub-vistas (<em>Resumen &amp; ROI</em>, <em>Campañas Meta</em>, <em>Ventas &amp; Cohorte</em>), atribución exacta <code>Redes Sociales</code> vs <code>Meta Ads</code> vs <code>Otros</code> y detalle de fecha de ingreso CRM, fecha de cierre, cohorte y días en cerrar.</td><td>Superada por v1.7</td></tr>
         <tr><td>1.5 / 27 Nov. 2026</td><td>Agrega <strong>Panel de Retorno de Inversión (ROI)</strong> en <strong>Estadísticas &amp; Ads</strong> (Inversión Ads + IA vs Ventas Ganadas <code>Cerrado</code>/<code>Cliente</code> por fecha de cierre real) y gráfica diaria <em>Inversión vs Ganado (\$USD)</em>.</td><td>Superada por v1.6</td></tr>
@@ -644,15 +644,15 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
     <h1 class="sec-h1" style="font-size:18.5px;">Analítica Estilo Metricool: Resumen ROI y Cohorte de Ventas CRM</h1>
     <p class="lead-p" style="margin-bottom:5px;">Evaluación ordenada por rango de fechas, origen exacto (<em>Meta Ads</em>, <em>Redes Sociales</em>, <em>Otros</em>) y maduración del prospecto.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Usar el selector único de marca, ver páginas y leer ROI</div>
-    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads</strong>, utilice el selector único de marca en la barra superior para cambiar entre cuentas Meta Ads viendo íconos y páginas conectadas, y combine <strong>Origen</strong> y <strong>Cohorte</strong> para evaluar ROI.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Operar en una línea: Selector único, Gráfica ROI, Cohorte y Embudo Ads → CRM</div>
+    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads</strong>, use el selector único superior y revise en la misma línea <strong>Inversión Meta Ads vs Ventas Ganadas</strong>, <strong>Cohorte &amp; Alcance</strong> y <strong>Embudo Ads → CRM</strong>.</p>
     <div class="shot-frame compact" style="width:76%;">
-      <img src="${pAnalytics}" alt="Selector único moderno de Marca y Cuentas estilo Metricool sobre Estadísticas y Ads" />
-      <div class="callout-box" style="left:22.4%;top:13.3%;width:25.1%;height:69.7%;"><span class="callout-tag bottom">1. Selector Único de Marca + Páginas</span></div>
-      <div class="callout-box" style="left:58.6%;top:36.9%;width:17.7%;height:12.8%;"><span class="callout-tag bottom">2. Utilidad Neta &amp; ROI</span></div>
-      <div class="callout-box" style="left:77.4%;top:36.9%;width:17.8%;height:12.8%;"><span class="callout-tag bottom right">3. Formularios &amp; CPL</span></div>
+      <img src="${pAnalytics}" alt="Estadísticas y Ads en una sola línea ejecutiva con Gráfica, Cohorte y Embudo" />
+      <div class="callout-box" style="left:35.8%;top:13.4%;width:11.8%;height:4.8%;"><span class="callout-tag bottom">1. Selector Único Superior</span></div>
+      <div class="callout-box" style="left:21.6%;top:50.8%;width:36.3%;height:45.8%;"><span class="callout-tag bottom">2. Gráfica Inversión vs Ganado</span></div>
+      <div class="callout-box" style="left:58.8%;top:50.8%;width:36.4%;height:45.8%;"><span class="callout-tag bottom right">3. Cohorte &amp; Embudo Ads → CRM en la misma línea</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Selector único estilo Metricool en la barra superior controlando Estadísticas &amp; Ads, con las 5 marcas, 9 páginas y métricas ROI (sin selector duplicado).</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Vista ejecutiva unificada en una sola línea (Gráfica + Cohorte + Embudo Ads → CRM) controlada desde el selector único superior.</div>
 
     <div class="step-hdr" style="margin-top:2px;"><span class="num">12 ·</span> Auditar fecha de ingreso CRM, fecha de cierre, días y origen en Ventas &amp; Cohorte</div>
     <p class="body-p" style="margin-bottom:3px;">En la sub-pestaña <strong>Ventas &amp; Cohorte</strong>, verifique qué cierres ingresaron en el mismo mes frente a meses anteriores, su origen real y ábralos directo en el CRM.</p>
