@@ -241,6 +241,21 @@ export default function SocialPlanning() {
         () => (accountFilter !== 'all' ? publishableAccounts.find((a) => a.account_id === accountFilter) || null : null),
         [accountFilter, publishableAccounts],
     );
+    const selectedMetaAdAccountId = useMemo(() => {
+        if (activeBrand) {
+            const adAcc = activeBrand.accounts.find((a) => a.platform === 'meta_ads' && a.account_id);
+            if (adAcc?.account_id) return adAcc.account_id;
+        }
+        if (activeSingleAccount) {
+            const ownerBrand = brandGroups.find((b) =>
+                b.accounts.some((a) => a.id === activeSingleAccount.id),
+            );
+            const adAcc = ownerBrand?.accounts.find((a) => a.platform === 'meta_ads' && a.account_id);
+            if (adAcc?.account_id) return adAcc.account_id;
+        }
+        const defaultAd = metaAdsAccounts.find((a) => a.is_default && a.account_id) || metaAdsAccounts[0];
+        return defaultAd?.account_id || undefined;
+    }, [activeBrand, activeSingleAccount, brandGroups, metaAdsAccounts]);
     const brandPostCounts = useMemo(() => {
         const map: Record<string, number> = {};
         for (const b of brandGroups) {
@@ -2269,7 +2284,7 @@ export default function SocialPlanning() {
                     <PlanningAnalyticsTab
                         companyId={companyId}
                         metaAdsAccounts={metaAdsAccounts}
-                        allSocialAccounts={accounts}
+                        selectedAdAccountId={selectedMetaAdAccountId}
                         onOpenConnect={() => setActiveTab('connections')}
                     />
                 )}
