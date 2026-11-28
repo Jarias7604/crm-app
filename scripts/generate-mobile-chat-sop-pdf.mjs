@@ -49,7 +49,7 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.7 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.8 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -233,10 +233,10 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.7 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">27 de noviembre de 2026 (v1.7: Barra iOS 26 Liquid Glass blanco esmerilado, Leads en 3 pasos Nuevos/En proceso/Renovaciones, cola Sin responder y dueño en móvil)</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.8 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">27 de noviembre de 2026 (v1.8: Bottom Sheet estilo iOS Apple en Filtros con selector de Período Hoy/Semana/Mes, multi-selección de bandejas y día calendario exacto Hoy/Ayer)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
-        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav Liquid Glass, Sidebar, flujo 3 pasos en Leads (/support/chat) y recuperación Anti-Ban</td></tr>
+        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav Liquid Glass, Bottom Sheet Filtros iOS, flujo 3 pasos en Leads (/support/chat) y recuperación Anti-Ban</td></tr>
       </table>
 
       <h3 class="sub-h">Criterio de diseño por dispositivo (Producto)</h3>
@@ -320,7 +320,7 @@ const html = `<!DOCTYPE html>
         <tr><td><strong>Flujo Leads en 3 pasos (v1.7)</strong></td><td>Separa la bandeja <strong>Leads</strong> en <strong>Nuevos</strong> (con badge <code>Nuevo · Hoy</code> y franja discreta <code>Por tomar</code>), <strong>En proceso</strong> (<code>En seguimiento</code> / <code>Demo</code>) y <strong>Renovaciones</strong> (<code>Cliente · Renov.</code> sin mezclarlos con prospectos nuevos).</td></tr>
         <tr><td><strong>Cola unificada <code>Sin responder</code> + Dock Liquid Glass</strong></td><td><code>Sin responder</code> primero en móvil/desktop sincronizado 1:1 con el título; chip de bandeja activa (<code>Leads ×</code>) siempre visible y barra inferior <strong>iOS 26 Liquid Glass</strong> blanco esmerilado suave (<code>36%–54%</code>, <code>blur(6px)</code>).</td></tr>
         <tr><td><strong>Tarjetas móviles 3 líneas con dueño</strong></td><td>Línea 1: Nombre completo + hora; Línea 2: Vista previa + estado (<em>Sin abrir</em>, <em>Sin responder</em>, <em>👁 Visto</em>); Línea 3: etapa pastel (<code>Nuevo · Hoy</code>), dueño corto (<em>Diana</em> / <em>Patricia</em> / <em>Sin asignar</em>) e indicador IA.</td></tr>
-        <tr><td><strong>Scroll nativo (<code>window</code>) + Modales centradas</strong></td><td>Cabecera fija translúcida (<code>60px</code>) y modales centradas (<em>Alertas</em> y <em>Refinar conversaciones</em>, <code>fixed inset-x-3</code>) con tipografía ampliada (<code>15.5px–16px</code>).</td></tr>
+        <tr><td><strong>Scroll nativo (<code>window</code>) + Bottom Sheet iOS (v1.8)</strong></td><td>Cabecera fija translúcida (<code>60px</code>), modales centradas (<em>Alertas</em>) y <strong>Bottom Sheet estilo iOS</strong> (<code>85dvh</code>) para <em>Filtros</em> con período (<code>Hoy · Semana · Mes</code>), multi-selección de bandejas y botón inferior fijo.</td></tr>
         <tr><td><strong>Estándar 100% SVG vectorial</strong></td><td>Todos los botones, barra flotante, indicadores de IA y acciones de burbuja usan vectores nítidos (cero emojis).</td></tr>
       </tbody>
     </table>
@@ -407,13 +407,13 @@ const html = `<!DOCTYPE html>
   ${ftr(4, TOTAL_PAGES)}
 </section>
 
-<!-- PAGE 5: MODALES CENTRADAS EN MÓVIL (ALERTAS Y FILTROS) -->
+<!-- PAGE 5: ALERTAS CENTRADA & BOTTOM SHEET iOS DE FILTROS -->
 <section class="page">
   <div>
     ${hdr()}
-    <div class="kicker">04 / MODALES CENTRADAS EN MÓVIL · ALERTAS Y FILTROS</div>
-    <h1 class="sec-h1">Centro de Alertas y Filtros centrados con lectura cómoda</h1>
-    <p class="lead-p">Ambos modales se centran en pantalla con márgenes simétricos (<code>fixed inset-x-3</code>), cero recorte lateral y tipografía ampliada (<code>15.5px–16px</code>) para operar sin esfuerzo en celular.</p>
+    <div class="kicker">04 / PANELES EN MÓVIL · ALERTAS Y BOTTOM SHEET iOS (FILTROS)</div>
+    <h1 class="sec-h1">Alertas centradas y Filtros Bottom Sheet estilo iOS Apple</h1>
+    <p class="lead-p"><em>Alertas</em> abre centrado para abrir chats urgentes sin recortes, y <strong>Filtros</strong> sube desde abajo como hoja iOS (<code>85dvh</code>) con selector de <strong>Período</strong> (<code>Todo · Hoy · Semana · Mes</code>) y multi-selección de bandejas.</p>
 
     <div class="two-phones">
       <!-- Column 1: Centered Alerts Modal -->
@@ -426,22 +426,22 @@ const html = `<!DOCTYPE html>
         <div class="fig-cap"><strong>Figura 5.</strong> Al tocar cualquier alerta abre directo la conversación en modo móvil completo.</div>
       </div>
 
-      <!-- Column 2: Centered Filters Modal -->
+      <!-- Column 2: iOS Apple Bottom Sheet Filters -->
       <div class="phone-col">
-        <div class="step-hdr" style="text-align:center;"><span class="num">06 ·</span> Menú de Filtros (Refinar)</div>
+        <div class="step-hdr" style="text-align:center;"><span class="num">06 ·</span> Bottom Sheet iOS · Filtros (Refinar)</div>
         <div class="phone-frame" style="margin-top: 16px;">
-          <img src="${sFiltros}" alt="Modal Refinar conversaciones centrada en móvil" />
-          <div class="callout-box" style="left:3.0%;top:13.2%;width:89.5%;height:72.0%;"><span class="callout-tag">2. Bandejas (Leads 1481) y SLA táctil</span></div>
+          <img src="${sFiltros}" alt="Bottom Sheet iOS Refinar conversaciones en móvil" />
+          <div class="callout-box" style="left:1.5%;top:14.2%;width:97.0%;height:84.8%;"><span class="callout-tag">2. Sheet iOS · Período + Multi-bandeja</span></div>
         </div>
-        <div class="fig-cap"><strong>Figura 6.</strong> Botón <strong>Filtros</strong> centrado para elegir responsable, SLA, bandejas o área sin desbordes.</div>
+        <div class="fig-cap"><strong>Figura 6.</strong> Hoja inferior iOS más alta (<code>85dvh</code>) con filtro <strong>Hoy / Semana / Mes</strong>, varias bandejas a la vez y botón fijo inferior.</div>
       </div>
     </div>
 
     <div class="info-box" style="margin-top: 10px;">
       <strong>Checklist de calidad verificado en producción (<code>ariascrm.com/support/chat</code>):</strong>
       <ul class="rules-list" style="margin-bottom:0; margin-top:4px;">
-        <li><strong>Móvil (<code>390×844</code>):</strong> lista de 3 líneas sin nombres recortados, Alertas y Filtros centrados, barras fijas arriba/abajo y <strong>0 errores de consola</strong>.</li>
-        <li><strong>Desktop (<code>1440×900</code>):</strong> conserva sus filas compactas de 2 líneas, 3 columnas y suite comercial/IA intacta con <strong>0 errores de consola</strong>.</li>
+        <li><strong>Móvil (<code>390×844</code>):</strong> Bottom Sheet iOS en <em>Filtros</em> (Período + multi-selección de bandejas), lista de 3 líneas sin contradicción <code>Hoy/Ayer</code> y <strong>0 errores de consola</strong>.</li>
+        <li><strong>Desktop (<code>1440×900</code>):</strong> conserva sus filas compactas de 2 líneas, 3 columnas, selector <code>Período</code> en <em>Filtros</em> y suite comercial/IA intacta con <strong>0 errores de consola</strong>.</li>
       </ul>
     </div>
   </div>
