@@ -5,10 +5,10 @@ import { pathToFileURL } from 'node:url';
 
 const WORKSPACE = process.cwd();
 const SCRATCH_SHOTS =
-  'C:/Users/jaria/.gemini/antigravity/brain/f784bcb3-452c-43a0-a5e5-480cabc9324b/scratch/screenshots';
+  'C:/Users/jaria/.gemini/antigravity/brain/f6e136e3-8fd0-4b66-a458-78558685f5ef/scratch/screenshots';
 const OUT_PDF = path.join(WORKSPACE, 'docs', 'SOP_Chat_WhatsApp_Movil_Nativo_Arias_CRM.pdf');
 const TMP_HTML = path.join(
-  'C:/Users/jaria/.gemini/antigravity/brain/f784bcb3-452c-43a0-a5e5-480cabc9324b/scratch',
+  'C:/Users/jaria/.gemini/antigravity/brain/f6e136e3-8fd0-4b66-a458-78558685f5ef/scratch',
   'sop_mobile_chat.html',
 );
 
@@ -49,7 +49,7 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.6 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.7 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -233,10 +233,10 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.6 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">25 de noviembre de 2026 (v1.6: Filtro No enviados, Reenviar sin pausar IA, QR con contador 55s y código 8 dígitos)</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.7 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">27 de noviembre de 2026 (v1.7: Barra iOS 26 Liquid Glass blanco esmerilado, Leads en 3 pasos Nuevos/En proceso/Renovaciones, cola Sin responder y dueño en móvil)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
-        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav, Sidebar, retiro/redirección de /marketing/chat → /support/chat y ChatComposer responsivo</td></tr>
+        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav Liquid Glass, Sidebar, flujo 3 pasos en Leads (/support/chat) y recuperación Anti-Ban</td></tr>
       </table>
 
       <h3 class="sub-h">Criterio de diseño por dispositivo (Producto)</h3>
@@ -291,9 +291,9 @@ const html = `<!DOCTYPE html>
         <!-- Mobile Branch -->
         <rect x="226" y="12" width="218" height="72" rx="8" fill="#EEF0FF" stroke="#4F46E5" stroke-width="1.6"/>
         <text x="335" y="33" text-anchor="middle" font-size="10.5" font-weight="800" fill="#312E81">Móvil (&lt; 768 px)</text>
-        <text x="335" y="49" text-anchor="middle" font-size="9" fill="#1e293b">1. Lista aireada + 1 fila filtros</text>
-        <text x="335" y="63" text-anchor="middle" font-size="9" fill="#1e293b">2. Chat 100dvh (oculta MobileNav)</text>
-        <text x="335" y="77" text-anchor="middle" font-size="8.5" font-weight="700" fill="#4338CA">Espacio libre con teclado (~52%)</text>
+        <text x="335" y="49" text-anchor="middle" font-size="9" fill="#1e293b">1. Leads 3 pasos: Nuevos → Proceso → Renov.</text>
+        <text x="335" y="63" text-anchor="middle" font-size="9" fill="#1e293b">2. Dock iOS 26 Liquid Glass esmerilado</text>
+        <text x="335" y="77" text-anchor="middle" font-size="8.5" font-weight="700" fill="#4338CA">Cola unificada Sin responder + Dueño</text>
 
         <path d="M 444 48 L 494 48" fill="none" stroke="#475569" stroke-width="1.6" marker-end="url(#arr)"/>
 
@@ -317,11 +317,11 @@ const html = `<!DOCTYPE html>
         <tr><th style="width:30%;">Mecanismo</th><th style="width:70%;">Beneficio directo para el usuario en celular</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Scroll nativo (<code>window</code>) + barras <code>fixed</code> en móvil</strong></td><td>En móvil (<code>min-h-[100dvh]</code> + <code>fixed top-0 / bottom-0</code>), deslizar el dedo retrae la barra del navegador manteniendo cabecera (<code>60px</code>) y compositor siempre visibles aun en hilos muy largos.</td></tr>
-        <tr><td><strong>Tarjetas móviles de 3 líneas (&lt; 768 px)</strong></td><td>Línea 1 muestra únicamente <strong>Nombre completo</strong> + hora (<code>16px</code>); Línea 2 vista previa + estado; Línea 3 agrupa chips (<em>Lead</em>, <em>Grupo</em>, <em>IA</em>, SLA) con contraste atenuado (<code>text-slate-600</code>) en chats leídos frente a no leídos en negrita (<code>text-slate-950</code>).</td></tr>
-        <tr><td><strong>Escala táctil nativa (&lt; 768 px)</strong></td><td>Tipografía legible en burbujas/lista (<code>15.5px–16px</code>), botones de <code>44px</code> y modales centrados ampliados (<code>15.5px</code>) igualando la comodidad de <em>Leads</em> y <em>Calendario</em>.</td></tr>
-        <tr><td><strong>Modales centradas (Alertas y Filtros)</strong></td><td>Los paneles <em>Centro de Alertas WhatsApp</em> y <em>Refinar conversaciones</em> se centran automáticamente (<code>fixed inset-x-3</code>) con nombres legibles y salto directo al chat al tocar una alerta.</td></tr>
-        <tr><td><strong>Estándar 100% SVG vectorial</strong></td><td>Todos los botones, navegación inferior, indicadores de IA y acciones de burbuja usan vectores nítidos (cero emojis).</td></tr>
+        <tr><td><strong>Flujo Leads en 3 pasos (v1.7)</strong></td><td>Separa la bandeja <strong>Leads</strong> en <strong>Nuevos</strong> (con badge <code>Nuevo · Hoy</code> y franja discreta <code>Por tomar</code>), <strong>En proceso</strong> (<code>En seguimiento</code> / <code>Demo</code>) y <strong>Renovaciones</strong> (<code>Cliente · Renov.</code> sin mezclarlos con prospectos nuevos).</td></tr>
+        <tr><td><strong>Cola unificada <code>Sin responder</code> + Dock Liquid Glass</strong></td><td><code>Sin responder</code> primero en móvil/desktop sincronizado 1:1 con el título; chip de bandeja activa (<code>Leads ×</code>) siempre visible y barra inferior <strong>iOS 26 Liquid Glass</strong> blanco esmerilado suave (<code>36%–54%</code>, <code>blur(6px)</code>).</td></tr>
+        <tr><td><strong>Tarjetas móviles 3 líneas con dueño</strong></td><td>Línea 1: Nombre completo + hora; Línea 2: Vista previa + estado (<em>Sin abrir</em>, <em>Sin responder</em>, <em>👁 Visto</em>); Línea 3: etapa pastel (<code>Nuevo · Hoy</code>), dueño corto (<em>Diana</em> / <em>Patricia</em> / <em>Sin asignar</em>) e indicador IA.</td></tr>
+        <tr><td><strong>Scroll nativo (<code>window</code>) + Modales centradas</strong></td><td>Cabecera fija translúcida (<code>60px</code>) y modales centradas (<em>Alertas</em> y <em>Refinar conversaciones</em>, <code>fixed inset-x-3</code>) con tipografía ampliada (<code>15.5px–16px</code>).</td></tr>
+        <tr><td><strong>Estándar 100% SVG vectorial</strong></td><td>Todos los botones, barra flotante, indicadores de IA y acciones de burbuja usan vectores nítidos (cero emojis).</td></tr>
       </tbody>
     </table>
   </div>
@@ -339,15 +339,15 @@ const html = `<!DOCTYPE html>
     <div class="two-phones">
       <!-- Column 1: List View -->
       <div class="phone-col">
-        <div class="step-hdr" style="text-align:center;"><span class="num">01 ·</span> Lista aireada y barra inferior única</div>
+        <div class="step-hdr" style="text-align:center;"><span class="num">01 ·</span> Flujo Leads en 3 pasos y Dock Liquid Glass</div>
         <div class="phone-frame" style="margin-top: 20px;">
-          <img src="${sLista}" alt="Lista de Chat WhatsApp en móvil" />
-          <div class="callout-box" style="left:1.5%;top:0.4%;width:97%;height:6.4%;"><span class="callout-tag">1. Cabecera 56px + Alertas</span></div>
-          <div class="callout-box" style="left:1.5%;top:14.2%;width:97%;height:5.3%;"><span class="callout-tag bottom">2. 1 sola fila deslizable de filtros</span></div>
-          <div class="callout-box" style="left:1.5%;top:34.8%;width:97%;height:12.4%;"><span class="callout-tag right">3. Nombre completo + chips abajo</span></div>
-          <div class="callout-box" style="left:1.5%;top:91.8%;width:97%;height:7.8%;"><span class="callout-tag">4. Barra MobileNav → /support/chat</span></div>
+          <img src="${sLista}" alt="Lista de Chat WhatsApp en móvil con flujo 3 pasos y Liquid Glass" />
+          <div class="callout-box" style="left:1.5%;top:0.2%;width:97%;height:6.2%;"><span class="callout-tag">1. Cabecera Liquid Glass + Alertas</span></div>
+          <div class="callout-box" style="left:1.5%;top:14.4%;width:97%;height:16.8%;"><span class="callout-tag" style="top:auto;bottom:-14px;left:45%;">2. Flujo 3 pasos + Por tomar</span></div>
+          <div class="callout-box" style="left:1.5%;top:32.2%;width:97%;height:12.6%;"><span class="callout-tag" style="top:auto;bottom:-14px;left:45%;">3. Nuevo · Hoy + Dueño + IA</span></div>
+          <div class="callout-box" style="left:1.5%;top:90.2%;width:97%;height:8.4%;"><span class="callout-tag bottom">4. Dock iOS 26 Liquid Glass esmerilado</span></div>
         </div>
-        <div class="fig-cap"><strong>Figura 1.</strong> Tarjetas móviles de 3 líneas: Línea 1 dedicada al nombre completo (<code>16px</code>), vista previa y chips compactos abajo.</div>
+        <div class="fig-cap" style="margin-top:20px;"><strong>Figura 1.</strong> Bandeja <strong>Leads</strong> ordenada (<code>Nuevos</code> → <code>En proceso</code> → <code>Renovaciones</code>), dueño visible (<em>Patricia</em> / <em>Diana</em>) y dock Liquid Glass.</div>
       </div>
 
       <!-- Column 2: Active Chat -->
@@ -431,7 +431,7 @@ const html = `<!DOCTYPE html>
         <div class="step-hdr" style="text-align:center;"><span class="num">06 ·</span> Menú de Filtros (Refinar)</div>
         <div class="phone-frame" style="margin-top: 16px;">
           <img src="${sFiltros}" alt="Modal Refinar conversaciones centrada en móvil" />
-          <div class="callout-box" style="left:2.4%;top:13.4%;width:92.2%;height:71.2%;"><span class="callout-tag">2. Opciones amplias (15.5px) y táctiles</span></div>
+          <div class="callout-box" style="left:3.0%;top:13.2%;width:89.5%;height:72.0%;"><span class="callout-tag">2. Bandejas (Leads 1481) y SLA táctil</span></div>
         </div>
         <div class="fig-cap"><strong>Figura 6.</strong> Botón <strong>Filtros</strong> centrado para elegir responsable, SLA, bandejas o área sin desbordes.</div>
       </div>
