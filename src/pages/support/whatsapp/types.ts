@@ -14,6 +14,9 @@ export interface LightClientRow {
 export type SupportChannelType = 'soporte' | 'contabilidad' | 'ventas' | 'otros';
 
 export type LeadStageSubFilter =
+  | 'nuevos'
+  | 'en_proceso'
+  | 'renovaciones'
   | 'activos'
   | 'sin_responder'
   | 'conversando'
@@ -42,6 +45,8 @@ export interface SupportCircle {
   memberOfGroups: { jid: string; subject: string | null }[];
   leadId: string | null;
   leadStatus: string | null;
+  leadCreatedAt?: string | null;
+  isFreshLead?: boolean;
   interestedProductId: string | null;
   leadOwnerId: string | null;
   leadOwnerName: string | null;

@@ -167,6 +167,8 @@ import {
   formatQuotedReplyText,
   parseQuotedReplyPrefix,
   isRetryableOutboxError,
+  classifyLeadStageGroup,
+  isFreshLeadWithinHours,
   type QuotedReplyRef,
 } from './whatsapp/helpers';
 import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
@@ -1226,6 +1228,11 @@ export const SupportChatCircles: React.FC = () => {
         memberOfGroups: Array.isArray(meta.member_of_groups) ? meta.member_of_groups : [],
         leadId,
         leadStatus: resolvedLeadStatus,
+        leadCreatedAt: (lead as any)?.created_at || activeTicket.created_at || null,
+        isFreshLead:
+          scope === 'lead' &&
+          classifyLeadStageGroup(resolvedLeadStatus) === 'nuevos' &&
+          isFreshLeadWithinHours((lead as any)?.created_at || activeTicket.created_at, 48),
         interestedProductId: (lead as any)?.interested_product_id || null,
         leadOwnerId,
         leadOwnerName: leadOwnerId ? agentMap.get(leadOwnerId) || null : null,
@@ -1534,19 +1541,27 @@ export const SupportChatCircles: React.FC = () => {
   // Browser tab title badge so agents/admins see pending messages even on another tab
   useEffect(() => {
     const baseTitle = 'Arias CRM · Chat WhatsApp';
-    const alertTotal = counts.waiting + counts.por_clasificar;
+    const alertTotal = counts.waiting;
     if (alertTotal > 0) {
-      document.title = `(${alertTotal}) Sin contestar · ${baseTitle}`;
+      document.title = `(${alertTotal}) Sin responder · ${baseTitle}`;
     } else {
       document.title = baseTitle;
     }
     return () => {
       document.title = 'Arias CRM';
     };
-  }, [counts.waiting, counts.por_clasificar]);
+  }, [counts.waiting]);
 
   const singleBucket: CircleBucket | null =
     specialTray === null && selectedBuckets.length === 1 ? selectedBuckets[0] : null;
+
+  useEffect(() => {
+    if (singleBucket === 'lead' && ['activos', 'sin_responder', 'conversando'].includes(leadSubFilter)) {
+      setLeadSubFilter('nuevos');
+    } else if (singleBucket === 'reactivados' && ['nuevos', 'en_proceso', 'renovaciones'].includes(leadSubFilter)) {
+      setLeadSubFilter('activos');
+    }
+  }, [singleBucket, leadSubFilter]);
 
   const bucketTabs = useMemo(() => {
     const tabs: { id: CircleBucket; label: string; alert?: boolean }[] = [];
@@ -1577,6 +1592,9 @@ export const SupportChatCircles: React.FC = () => {
       return false;
     });
     let activos = 0;
+    let nuevos = 0;
+    let enProceso = 0;
+    let renovaciones = 0;
     let sinResponder = 0;
     let readyForResend48h = 0;
     let maxHoursUnder48 = 0;
@@ -1589,6 +1607,11 @@ export const SupportChatCircles: React.FC = () => {
       if (isPerdido) perdidos++;
       else if (isErroneo) erroneos++;
       else {
+        const grp = classifyLeadStageGroup(c.leadStatus);
+        if (grp === 'nuevos') nuevos++;
+        else if (grp === 'en_proceso') enProceso++;
+        else if (grp === 'renovaciones') renovaciones++;
+
         if (singleBucket === 'reactivados') {
           if (c.reactivationReplied) {
             activos++;
@@ -1607,7 +1630,19 @@ export const SupportChatCircles: React.FC = () => {
       }
     }
     const minHoursUntil48h = sinResponder > 0 && readyForResend48h === 0 ? Math.max(1, 48 - maxHoursUnder48) : 0;
-    return { activos, sinResponder, readyForResend48h, minHoursUntil48h, conversando, perdidos, erroneos, todos: base.length };
+    return {
+      activos,
+      nuevos,
+      enProceso,
+      renovaciones,
+      sinResponder,
+      readyForResend48h,
+      minHoursUntil48h,
+      conversando,
+      perdidos,
+      erroneos,
+      todos: base.length,
+    };
   }, [circles, singleBucket]);
 
   const { resendLeadsPool, resendTouchInfoMap } = useMemo(() => {
@@ -1670,9 +1705,22 @@ export const SupportChatCircles: React.FC = () => {
       if (!q && (singleBucket === 'reactivados' || singleBucket === 'lead')) {
         const isPerdido = c.leadStatus === 'Perdido';
         const isErroneo = c.leadStatus === 'Erróneo';
-        if (leadSubFilter === 'activos') {
+        if (singleBucket === 'lead') {
+          const grp = classifyLeadStageGroup(c.leadStatus);
+          if (leadSubFilter === 'nuevos') {
+            if (grp !== 'nuevos') return false;
+          } else if (leadSubFilter === 'en_proceso') {
+            if (grp !== 'en_proceso') return false;
+          } else if (leadSubFilter === 'renovaciones') {
+            if (grp !== 'renovaciones') return false;
+          } else if (leadSubFilter === 'perdidos') {
+            if (grp !== 'perdidos') return false;
+          } else if (leadSubFilter === 'erroneos') {
+            if (grp !== 'erroneos') return false;
+          }
+        } else if (leadSubFilter === 'activos') {
           if (isPerdido || isErroneo) return false;
-          if (singleBucket === 'reactivados' && !c.reactivationReplied) return false;
+          if (!c.reactivationReplied) return false;
         } else if (leadSubFilter === 'sin_responder') {
           if (isPerdido || isErroneo || c.reactivationReplied) return false;
         } else if (leadSubFilter === 'conversando') {
@@ -1966,7 +2014,7 @@ export const SupportChatCircles: React.FC = () => {
       knownLeadIdsRef.current.add(leadId);
       const { data } = await supabase
         .from('leads')
-        .select('id, name, email, phone, status, es_cliente, assigned_to, interested_product_id')
+        .select('id, name, email, phone, status, es_cliente, assigned_to, interested_product_id, created_at')
         .eq('id', leadId)
         .maybeSingle();
       if (data) {
@@ -4196,7 +4244,7 @@ export const SupportChatCircles: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setSpecialTray(null);
-                        setLeadSubFilter('activos');
+                        setLeadSubFilter('nuevos');
                         setSelectedBuckets(['lead']);
                         setShowFilterMenu(false);
                       }}
@@ -4344,74 +4392,8 @@ export const SupportChatCircles: React.FC = () => {
               </>
             )}
 
-            {/* Row 1 Mobile: Barra simple estilo WhatsApp (Todos · No leídos · Sin contestar + chips activos) */}
+            {/* Row 1 Mobile: Chip de bandeja activa siempre visible + Todos · Sin responder · No leídos */}
             <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  setSpecialTray(null);
-                  setSelectedBuckets([]);
-                  setStateFilters([]);
-                  setOwnerFilter('all');
-                  setChannelFilter('all');
-                  setLeadSubFilter('activos');
-                }}
-                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 ${
-                  specialTray === null && selectedBuckets.length === 0 && stateFilters.length === 0
-                    ? 'bg-slate-900 text-white font-bold'
-                    : 'bg-slate-100 text-slate-700 font-semibold'
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
-                  setStateFilters((prev) => (prev.includes('unread') ? [] : ['unread']));
-                }}
-                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
-                  stateFilters.includes('unread')
-                    ? 'bg-indigo-600 text-white font-bold shadow-2xs'
-                    : 'bg-slate-100 text-slate-700 font-semibold'
-                }`}
-              >
-                {contextCounts.unread > 0 && !stateFilters.includes('unread') && (
-                  <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
-                )}
-                <span>No leídos ({contextCounts.unread})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
-                  setStateFilters((prev) => (prev.includes('waiting') ? [] : ['waiting']));
-                }}
-                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
-                  stateFilters.includes('waiting')
-                    ? 'bg-indigo-600 text-white font-bold shadow-2xs'
-                    : 'bg-slate-100 text-slate-700 font-semibold'
-                }`}
-              >
-                <span>Sin contestar ({contextCounts.waiting})</span>
-              </button>
-              {(contextCounts.failed > 0 || stateFilters.includes('failed')) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
-                    setStateFilters((prev) => (prev.includes('failed') ? [] : ['failed']));
-                  }}
-                  className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
-                    stateFilters.includes('failed')
-                      ? 'bg-rose-600 text-white font-bold'
-                      : 'bg-rose-50 text-rose-700 border border-rose-200 font-semibold'
-                  }`}
-                >
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>No enviados ({contextCounts.failed})</span>
-                </button>
-              )}
               {selectedBuckets.map((b) => {
                 const label =
                   b === 'soporte'
@@ -4446,6 +4428,72 @@ export const SupportChatCircles: React.FC = () => {
                 >
                   <span>{specialTray === 'interno' ? 'Equipo' : specialTray === 'spam' ? 'Spam' : 'Tickets'}</span>
                   <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSpecialTray(null);
+                  setSelectedBuckets([]);
+                  setStateFilters([]);
+                  setOwnerFilter('all');
+                  setChannelFilter('all');
+                  setLeadSubFilter('activos');
+                }}
+                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 ${
+                  specialTray === null && selectedBuckets.length === 0 && stateFilters.length === 0
+                    ? 'bg-slate-900 text-white font-bold'
+                    : 'bg-slate-100 text-slate-700 font-semibold'
+                }`}
+              >
+                Todos
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                  setStateFilters((prev) => (prev.includes('waiting') ? [] : ['waiting']));
+                }}
+                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
+                  stateFilters.includes('waiting')
+                    ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 font-semibold'
+                }`}
+              >
+                <span>Sin responder ({contextCounts.waiting})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                  setStateFilters((prev) => (prev.includes('unread') ? [] : ['unread']));
+                }}
+                className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
+                  stateFilters.includes('unread')
+                    ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 font-semibold'
+                }`}
+              >
+                {contextCounts.unread > 0 && !stateFilters.includes('unread') && (
+                  <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                )}
+                <span>No leídos ({contextCounts.unread})</span>
+              </button>
+              {(contextCounts.failed > 0 || stateFilters.includes('failed')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                    setStateFilters((prev) => (prev.includes('failed') ? [] : ['failed']));
+                  }}
+                  className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1.5 ${
+                    stateFilters.includes('failed')
+                      ? 'bg-rose-600 text-white font-bold'
+                      : 'bg-rose-50 text-rose-700 border border-rose-200 font-semibold'
+                  }`}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>No enviados ({contextCounts.failed})</span>
                 </button>
               )}
               {stateFilters.includes('replied') && (
@@ -4485,8 +4533,11 @@ export const SupportChatCircles: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setSpecialTray(null);
-                      setLeadSubFilter('activos');
-                      setSelectedBuckets((prev) => toggleBucketSelection(prev, tab.id));
+                      setSelectedBuckets((prev) => {
+                        const next = toggleBucketSelection(prev, tab.id);
+                        setLeadSubFilter(next.length === 1 && next[0] === 'lead' ? 'nuevos' : 'activos');
+                        return next;
+                      });
                     }}
                     className={`px-2 py-1 rounded-lg text-[12px] whitespace-nowrap transition shrink-0 inline-flex items-center gap-1 ${
                       active
@@ -4521,9 +4572,9 @@ export const SupportChatCircles: React.FC = () => {
             <div className="hidden md:flex items-center gap-1 flex-wrap">
               {(
                 [
-                  { id: 'unopened' as CircleStateFilter, label: `Sin abrir (${contextCounts.unopened})`, count: contextCounts.unopened, primary: true },
+                  { id: 'waiting' as CircleStateFilter, label: `Sin responder (${contextCounts.waiting})`, count: contextCounts.waiting, primary: true },
+                  { id: 'unopened' as CircleStateFilter, label: `Sin abrir (${contextCounts.unopened})`, count: contextCounts.unopened },
                   { id: 'unread' as CircleStateFilter, label: `No leídos (${contextCounts.unread})`, count: contextCounts.unread },
-                  { id: 'waiting' as CircleStateFilter, label: `Sin contestar (${contextCounts.waiting})`, count: contextCounts.waiting },
                 ]
               ).map((st) => {
                 const active = stateFilters.includes(st.id);
@@ -4641,23 +4692,31 @@ export const SupportChatCircles: React.FC = () => {
                 )}
 
                 <div className="flex items-center gap-1.5 md:gap-1 overflow-x-auto flex-nowrap md:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {(
-                    [
-                      {
-                        id: 'activos' as LeadStageSubFilter,
-                        label: singleBucket === 'reactivados' ? `Interesados (${leadSubCounts.activos})` : `Activos (${leadSubCounts.activos})`,
-                        show: true,
-                      },
-                      {
-                        id: 'sin_responder' as LeadStageSubFilter,
-                        label: `Sin responder (${leadSubCounts.sinResponder})`,
-                        show: singleBucket === 'reactivados',
-                      },
-                      { id: 'conversando' as LeadStageSubFilter, label: `Seguimiento / Demo (${leadSubCounts.conversando})`, show: true },
-                      { id: 'perdidos' as LeadStageSubFilter, label: `Perdidos (${leadSubCounts.perdidos})`, show: true },
-                      { id: 'erroneos' as LeadStageSubFilter, label: `Erróneos (${leadSubCounts.erroneos})`, show: true },
-                      { id: 'todos' as LeadStageSubFilter, label: `Todos (${leadSubCounts.todos})`, show: true },
-                    ]
+                  {(singleBucket === 'lead'
+                    ? [
+                        { id: 'nuevos' as LeadStageSubFilter, label: `Nuevos (${leadSubCounts.nuevos})`, show: true },
+                        { id: 'en_proceso' as LeadStageSubFilter, label: `En proceso (${leadSubCounts.enProceso})`, show: true },
+                        { id: 'renovaciones' as LeadStageSubFilter, label: `Renovaciones (${leadSubCounts.renovaciones})`, show: true },
+                        { id: 'perdidos' as LeadStageSubFilter, label: `Perdidos (${leadSubCounts.perdidos})`, show: true },
+                        { id: 'erroneos' as LeadStageSubFilter, label: `Erróneos (${leadSubCounts.erroneos})`, show: true },
+                        { id: 'todos' as LeadStageSubFilter, label: `Todos (${leadSubCounts.todos})`, show: true },
+                      ]
+                    : [
+                        {
+                          id: 'activos' as LeadStageSubFilter,
+                          label: `Interesados (${leadSubCounts.activos})`,
+                          show: true,
+                        },
+                        {
+                          id: 'sin_responder' as LeadStageSubFilter,
+                          label: `Sin responder (${leadSubCounts.sinResponder})`,
+                          show: true,
+                        },
+                        { id: 'conversando' as LeadStageSubFilter, label: `Seguimiento / Demo (${leadSubCounts.conversando})`, show: true },
+                        { id: 'perdidos' as LeadStageSubFilter, label: `Perdidos (${leadSubCounts.perdidos})`, show: true },
+                        { id: 'erroneos' as LeadStageSubFilter, label: `Erróneos (${leadSubCounts.erroneos})`, show: true },
+                        { id: 'todos' as LeadStageSubFilter, label: `Todos (${leadSubCounts.todos})`, show: true },
+                      ]
                   )
                     .filter((sf) => sf.show)
                     .map((sf) => {
@@ -4679,6 +4738,22 @@ export const SupportChatCircles: React.FC = () => {
                       );
                     })}
                 </div>
+                {singleBucket === 'lead' && leadSubFilter === 'nuevos' && counts.por_clasificar > 0 && scopes.leadsPool && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSpecialTray(null);
+                      setSelectedBuckets(['por_clasificar']);
+                      setLeadSubFilter('activos');
+                    }}
+                    className="w-full px-3 py-1.5 rounded-xl bg-amber-50/80 hover:bg-amber-50 border border-amber-200/70 flex items-center justify-between gap-2 text-[12px] md:text-[11.5px] text-amber-900 transition"
+                  >
+                    <span className="truncate font-medium">
+                      <strong className="font-bold">{counts.por_clasificar}</strong> entrante{counts.por_clasificar === 1 ? '' : 's'} en WhatsApp por clasificar
+                    </span>
+                    <span className="font-bold text-amber-700 shrink-0">Revisar →</span>
+                  </button>
+                )}
               </div>
             )}
             {stateFilters.includes('failed') && batchFailedTargets.length > 0 && canSend && (

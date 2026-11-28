@@ -1,7 +1,13 @@
 import { useState, useEffect, memo } from 'react';
 import { Users, Clock, Eye, Check, CheckCheck, Bot, Calendar, UserCheck, AlertTriangle } from 'lucide-react';
 import type { SupportCircle } from './types';
-import { initials, formatWaitDuration, listTimeLabel } from './helpers';
+import {
+  initials,
+  formatWaitDuration,
+  listTimeLabel,
+  extractShortAgentName,
+  classifyLeadStageGroup,
+} from './helpers';
 
 export const ActiveSessionTimer = memo<{ startedAt: number }>(({ startedAt }) => {
   const [sec, setSec] = useState(() => Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
@@ -33,6 +39,10 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
   const ticketMeta = ((circle.activeTicket?.metadata || {}) as Record<string, any>);
   const qualifierStatus = String(ticketMeta.ai_qualifier_status || '');
   const isQualifierActive = ticketMeta.ai_qualifier_active === true;
+  const leadGroup = circle.scope === 'lead' ? classifyLeadStageGroup(circle.leadStatus) : null;
+  const ownerShort = extractShortAgentName(
+    circle.leadOwnerName || (circle.assignedTechName && circle.assignedTechName !== 'Sin asignar' ? circle.assignedTechName : ''),
+  );
   const shortType =
     circle.scope === 'soporte'
       ? circle.isGroup
@@ -41,9 +51,13 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
       : circle.scope === 'por_clasificar'
       ? 'Por tomar'
       : circle.scope === 'lead'
-      ? circle.leadStatus && circle.leadStatus !== 'Prospecto'
-        ? circle.leadStatus
-        : 'Lead'
+      ? leadGroup === 'renovaciones'
+        ? 'Cliente · Renov.'
+        : leadGroup === 'nuevos'
+        ? circle.isFreshLead
+          ? 'Nuevo · Hoy'
+          : 'Nuevo'
+        : circle.leadStatus || 'En proceso'
       : circle.scope === 'interno'
       ? 'Equipo'
       : 'Spam';
@@ -178,7 +192,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
               title="Ya abierto por ti · Pendiente de responder"
               className="px-2.5 md:px-1.5 py-1 md:py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 text-[12px] md:text-[10px] font-semibold leading-none shrink-0"
             >
-              Sin contestar
+              Sin responder
             </span>
           ) : circle.teamStatus === 'replied' ? (
             <span
@@ -205,16 +219,30 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             </span>
           ) : null}
         </div>
-        <div className="md:hidden mt-2 flex items-center gap-2 flex-wrap">
+        <div className="md:hidden mt-2 flex items-center gap-1.5 flex-wrap">
           <span
             className={`px-2.5 py-1 rounded-md text-[12px] font-semibold leading-none ${
-              circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
-                ? 'bg-slate-100 text-slate-500'
+              circle.scope === 'lead' && leadGroup === 'nuevos' && circle.isFreshLead
+                ? 'bg-sky-50 text-sky-700 border border-sky-200/70'
+                : circle.scope === 'lead' && leadGroup === 'renovaciones'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
                 : 'bg-slate-100 text-slate-600'
             }`}
           >
             {shortType}
           </span>
+          {circle.scope === 'lead' &&
+            leadGroup !== 'perdidos' &&
+            leadGroup !== 'erroneos' &&
+            (ownerShort ? (
+              <span className="px-2 py-1 rounded-md bg-slate-50 text-slate-500 border border-slate-200/70 text-[12px] font-medium leading-none">
+                {ownerShort}
+              </span>
+            ) : leadGroup === 'nuevos' || leadGroup === 'en_proceso' ? (
+              <span className="px-2 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200/70 text-[12px] font-medium leading-none">
+                Sin asignar
+              </span>
+            ) : null)}
           {circle.isReactivation && (
             <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-500 text-[12px] font-medium leading-none">
               {circle.reactivationReplied ? 'React.' : `Toque ${circle.reactivationTouch || 1}`}

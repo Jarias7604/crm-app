@@ -742,6 +742,37 @@ export function formatQuotedReplyText(reply: QuotedReplyRef | null | undefined, 
   return `> ${sender}: ${snippet}\n\n${cleanBody}`;
 }
 
+export type LeadStageGroup = 'nuevos' | 'en_proceso' | 'renovaciones' | 'perdidos' | 'erroneos';
+
+export function classifyLeadStageGroup(leadStatus?: string | null): LeadStageGroup {
+  const s = String(leadStatus || '').trim();
+  if (s === 'Perdido') return 'perdidos';
+  if (s === 'Erróneo') return 'erroneos';
+  if (s === 'Cliente' || s === 'Cerrado') return 'renovaciones';
+  if (
+    s === 'Llamada fría' ||
+    s === 'En Nutrición' ||
+    s === 'Lead calificado' ||
+    s === 'En seguimiento' ||
+    s === 'Negociación'
+  ) {
+    return 'en_proceso';
+  }
+  return 'nuevos';
+}
+
+export function isFreshLeadWithinHours(
+  createdAtIso?: string | null,
+  hours = 48,
+  nowMs = Date.now(),
+): boolean {
+  if (!createdAtIso) return false;
+  const ts = Date.parse(createdAtIso);
+  if (!Number.isFinite(ts)) return false;
+  const diff = nowMs - ts;
+  return diff >= -60_000 && diff <= hours * 3_600_000;
+}
+
 export function parseQuotedReplyPrefix(rawText: string): { quote: { author: string; text: string } | null; body: string } {
   const raw = String(rawText || '');
   const m = raw.match(/^>\s*([^:\n]{1,60}):\s*([^\n]+)\n+([\s\S]*)$/);

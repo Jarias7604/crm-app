@@ -815,3 +815,22 @@ test('15. shouldTriggerLeadQualifier & buildQualifierInvokeHeaders handle catchu
     apikey: 'srv-only',
   });
 });
+
+test('16. classifyLeadStageGroup and isFreshLeadWithinHours separate Nuevos, En proceso, and Renovaciones cleanly', () => {
+  const { classifyLeadStageGroup, isFreshLeadWithinHours } = loaded.waHelpers;
+  assert.equal(classifyLeadStageGroup('Prospecto'), 'nuevos');
+  assert.equal(classifyLeadStageGroup(null), 'nuevos');
+  assert.equal(classifyLeadStageGroup(''), 'nuevos');
+  assert.equal(classifyLeadStageGroup('En seguimiento'), 'en_proceso');
+  assert.equal(classifyLeadStageGroup('Lead calificado'), 'en_proceso');
+  assert.equal(classifyLeadStageGroup('Negociación'), 'en_proceso');
+  assert.equal(classifyLeadStageGroup('Cliente'), 'renovaciones');
+  assert.equal(classifyLeadStageGroup('Cerrado'), 'renovaciones');
+  assert.equal(classifyLeadStageGroup('Perdido'), 'perdidos');
+  assert.equal(classifyLeadStageGroup('Erróneo'), 'erroneos');
+
+  const now = Date.parse('2026-11-28T01:00:00Z');
+  assert.equal(isFreshLeadWithinHours('2026-11-27T12:00:00Z', 48, now), true);
+  assert.equal(isFreshLeadWithinHours('2026-11-20T12:00:00Z', 48, now), false);
+  assert.equal(isFreshLeadWithinHours(null, 48, now), false);
+});
