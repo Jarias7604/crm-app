@@ -54,9 +54,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
       ? leadGroup === 'renovaciones'
         ? 'Cliente · Renov.'
         : leadGroup === 'nuevos'
-        ? circle.isFreshLead
-          ? 'Nuevo · Hoy'
-          : 'Nuevo'
+        ? circle.freshLeadLabel || (circle.isFreshLead ? 'Nuevo · Hoy' : 'Nuevo')
         : circle.leadStatus || 'En proceso'
       : circle.scope === 'interno'
       ? 'Equipo'
@@ -222,8 +220,10 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
         <div className="md:hidden mt-2 flex items-center gap-1.5 flex-wrap">
           <span
             className={`px-2.5 py-1 rounded-md text-[12px] font-semibold leading-none ${
-              circle.scope === 'lead' && leadGroup === 'nuevos' && circle.isFreshLead
+              circle.scope === 'lead' && leadGroup === 'nuevos' && shortType === 'Nuevo · Hoy'
                 ? 'bg-sky-50 text-sky-700 border border-sky-200/70'
+                : circle.scope === 'lead' && leadGroup === 'nuevos' && shortType === 'Nuevo · Ayer'
+                ? 'bg-slate-100 text-slate-700 border border-slate-200/80'
                 : circle.scope === 'lead' && leadGroup === 'renovaciones'
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
                 : 'bg-slate-100 text-slate-600'

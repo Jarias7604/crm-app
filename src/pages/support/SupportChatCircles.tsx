@@ -168,7 +168,7 @@ import {
   parseQuotedReplyPrefix,
   isRetryableOutboxError,
   classifyLeadStageGroup,
-  isFreshLeadWithinHours,
+  getFreshLeadLabel,
   type QuotedReplyRef,
 } from './whatsapp/helpers';
 import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
@@ -1215,6 +1215,11 @@ export const SupportChatCircles: React.FC = () => {
 
       const failedOutboxCount = sorted.reduce((acc, t) => acc + (failedOutboxByTicket.get(t.id)?.length || 0), 0);
 
+      const freshLeadLabel =
+        scope === 'lead' && classifyLeadStageGroup(resolvedLeadStatus) === 'nuevos'
+          ? getFreshLeadLabel((lead as any)?.created_at || activeTicket.created_at, lastMessageAt)
+          : null;
+
       list.push({
         circleId: key,
         clientName,
@@ -1229,10 +1234,8 @@ export const SupportChatCircles: React.FC = () => {
         leadId,
         leadStatus: resolvedLeadStatus,
         leadCreatedAt: (lead as any)?.created_at || activeTicket.created_at || null,
-        isFreshLead:
-          scope === 'lead' &&
-          classifyLeadStageGroup(resolvedLeadStatus) === 'nuevos' &&
-          isFreshLeadWithinHours((lead as any)?.created_at || activeTicket.created_at, 48),
+        freshLeadLabel,
+        isFreshLead: freshLeadLabel === 'Nuevo · Hoy',
         interestedProductId: (lead as any)?.interested_product_id || null,
         leadOwnerId,
         leadOwnerName: leadOwnerId ? agentMap.get(leadOwnerId) || null : null,

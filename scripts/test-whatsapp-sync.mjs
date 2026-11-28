@@ -816,8 +816,8 @@ test('15. shouldTriggerLeadQualifier & buildQualifierInvokeHeaders handle catchu
   });
 });
 
-test('16. classifyLeadStageGroup and isFreshLeadWithinHours separate Nuevos, En proceso, and Renovaciones cleanly', () => {
-  const { classifyLeadStageGroup, isFreshLeadWithinHours } = loaded.waHelpers;
+test('16. classifyLeadStageGroup, isFreshLeadWithinHours, and getFreshLeadLabel respect El Salvador calendar days', () => {
+  const { classifyLeadStageGroup, isFreshLeadWithinHours, getFreshLeadLabel } = loaded.waHelpers;
   assert.equal(classifyLeadStageGroup('Prospecto'), 'nuevos');
   assert.equal(classifyLeadStageGroup(null), 'nuevos');
   assert.equal(classifyLeadStageGroup(''), 'nuevos');
@@ -829,8 +829,18 @@ test('16. classifyLeadStageGroup and isFreshLeadWithinHours separate Nuevos, En 
   assert.equal(classifyLeadStageGroup('Perdido'), 'perdidos');
   assert.equal(classifyLeadStageGroup('Erróneo'), 'erroneos');
 
-  const now = Date.parse('2026-11-28T01:00:00Z');
+  const now = Date.parse('2026-11-28T03:00:00Z'); // 2026-11-27 21:00 America/El_Salvador
   assert.equal(isFreshLeadWithinHours('2026-11-27T12:00:00Z', 48, now), true);
   assert.equal(isFreshLeadWithinHours('2026-11-20T12:00:00Z', 48, now), false);
   assert.equal(isFreshLeadWithinHours(null, 48, now), false);
+
+  // Same El Salvador calendar day -> Nuevo · Hoy
+  assert.equal(getFreshLeadLabel('2026-11-27T18:00:00Z', '2026-11-27T19:00:00Z', now), 'Nuevo · Hoy');
+  // Previous El Salvador calendar day (even if < 48h ago) -> Nuevo · Ayer
+  assert.equal(getFreshLeadLabel('2026-11-26T22:00:00Z', '2026-11-26T23:00:00Z', now), 'Nuevo · Ayer');
+  // 2+ El Salvador calendar days ago -> null (renders plain "Nuevo")
+  assert.equal(getFreshLeadLabel('2026-11-25T20:00:00Z', '2026-11-25T21:00:00Z', now), null);
+  // Lead created today but lastMessageAt from yesterday -> clamped to Nuevo · Ayer (no Hoy vs Ayer contradiction)
+  assert.equal(getFreshLeadLabel('2026-11-28T01:00:00Z', '2026-11-26T22:00:00Z', now), 'Nuevo · Ayer');
+  assert.equal(getFreshLeadLabel(null, '2026-11-27T19:00:00Z', now), null);
 });

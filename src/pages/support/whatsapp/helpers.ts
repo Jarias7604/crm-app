@@ -773,6 +773,45 @@ export function isFreshLeadWithinHours(
   return diff >= -60_000 && diff <= hours * 3_600_000;
 }
 
+export type FreshLeadLabel = 'Nuevo · Hoy' | 'Nuevo · Ayer' | null;
+
+const SV_YMD_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/El_Salvador',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export function getFreshLeadLabel(
+  createdAtIso?: string | null,
+  lastMessageAtIso?: string | null,
+  nowMs = Date.now(),
+): FreshLeadLabel {
+  if (!createdAtIso) return null;
+  const createdTs = Date.parse(createdAtIso);
+  if (!Number.isFinite(createdTs)) return null;
+
+  const todayYmd = SV_YMD_FORMATTER.format(new Date(nowMs));
+  const yesterdayYmd = SV_YMD_FORMATTER.format(new Date(nowMs - 86_400_000));
+  const leadYmd = SV_YMD_FORMATTER.format(new Date(createdTs));
+
+  let msgYmd: string | null = null;
+  if (lastMessageAtIso) {
+    const msgTs = Date.parse(lastMessageAtIso);
+    if (Number.isFinite(msgTs)) {
+      msgYmd = SV_YMD_FORMATTER.format(new Date(msgTs));
+    }
+  }
+
+  // Use the earlier calendar day if lastMessageAt is from a previous day so a card showing "Ayer"
+  // or an older date can never contradictorily display "Nuevo · Hoy".
+  const effectiveYmd = msgYmd && msgYmd < leadYmd ? msgYmd : leadYmd;
+
+  if (effectiveYmd === todayYmd) return 'Nuevo · Hoy';
+  if (effectiveYmd === yesterdayYmd) return 'Nuevo · Ayer';
+  return null;
+}
+
 export function parseQuotedReplyPrefix(rawText: string): { quote: { author: string; text: string } | null; body: string } {
   const raw = String(rawText || '');
   const m = raw.match(/^>\s*([^:\n]{1,60}):\s*([^\n]+)\n+([\s\S]*)$/);

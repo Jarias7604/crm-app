@@ -46,6 +46,7 @@ export interface SupportCircle {
   leadId: string | null;
   leadStatus: string | null;
   leadCreatedAt?: string | null;
+  freshLeadLabel?: 'Nuevo · Hoy' | 'Nuevo · Ayer' | null;
   isFreshLead?: boolean;
   interestedProductId: string | null;
   leadOwnerId: string | null;
