@@ -252,3 +252,38 @@ test('8. matchBrandSocialAccounts & pickDistinctPlatformAccounts match brands to
     ['facebook', 'instagram', 'youtube', 'meta_ads'],
   );
 });
+
+test('9. groupSocialBrands clusters FB/IG/YT/Meta Ads per brand and matches spaceless IG handles', () => {
+  const fullTopology = [
+    { id: 'fb1', platform: 'facebook', account_id: 'fb_ag', account_name: 'Arias Group', avatar_url: 'https://scontent.fb/ag.jpg', is_default: false },
+    { id: 'fb2', platform: 'facebook', account_id: 'fb_ja', account_name: 'Jimmy Arias AI + Lean', avatar_url: 'https://scontent.fb/ja.jpg', is_default: true },
+    { id: 'fb3', platform: 'facebook', account_id: 'fb_ic', account_name: 'Iclesia AI', avatar_url: 'https://scontent.fb/ic.jpg', is_default: false },
+    { id: 'fb4', platform: 'facebook', account_id: 'fb_ad', account_name: 'Arias Defense Components LLC', avatar_url: 'https://scontent.fb/ad.jpg', is_default: false },
+    { id: 'ig1', platform: 'instagram', account_id: 'ig_ag', account_name: 'ariasgroupsv', avatar_url: null, is_default: false },
+    { id: 'ig2', platform: 'instagram', account_id: 'ig_ja', account_name: 'jimmy.arias147c', avatar_url: null, is_default: false },
+    { id: 'yt1', platform: 'youtube', account_id: 'yt_ic', account_name: 'Iclesia', avatar_url: 'https://yt3.ggpht.com/ic.jpg', is_default: true },
+    { id: 'yt2', platform: 'youtube', account_id: 'yt_ja', account_name: 'Jimmy Arias', avatar_url: 'https://yt3.ggpht.com/ja.jpg', is_default: false },
+    { id: 'yt3', platform: 'youtube', account_id: 'yt_af', account_name: 'ARIAS FINTECH', avatar_url: 'https://yt3.ggpht.com/af.jpg', is_default: false },
+    { id: 'ma1', platform: 'meta_ads', account_id: 'act_1', account_name: 'Arias Group', avatar_url: null, is_default: true },
+    { id: 'ma2', platform: 'meta_ads', account_id: 'act_2', account_name: 'Arias Defense Components', avatar_url: null, is_default: false },
+    { id: 'ma3', platform: 'meta_ads', account_id: 'act_3', account_name: 'Jimmy Arias', avatar_url: null, is_default: false },
+  ];
+
+  const brands = matcherMod.groupSocialBrands(fullTopology);
+  assert.equal(brands.length, 5);
+
+  const ariasGroup = brands.find((b) => b.name === 'Arias Group');
+  assert.ok(ariasGroup);
+  assert.deepEqual(ariasGroup.publishableAccountIds.sort(), ['fb_ag', 'ig_ag']);
+  assert.equal(ariasGroup.platforms.includes('meta_ads'), true);
+  assert.equal(ariasGroup.platforms.includes('instagram'), true);
+
+  const jimmy = brands.find((b) => b.name === 'Jimmy Arias AI + Lean');
+  assert.ok(jimmy);
+  assert.deepEqual(jimmy.publishableAccountIds.sort(), ['fb_ja', 'ig_ja', 'yt_ja']);
+  assert.equal(jimmy.avatarUrls[0], 'https://yt3.ggpht.com/ja.jpg'); // prioritizes reliable YT URL over FB scontent
+
+  const iclesia = brands.find((b) => b.name === 'Iclesia AI');
+  assert.ok(iclesia);
+  assert.deepEqual(iclesia.publishableAccountIds.sort(), ['fb_ic', 'yt_ic']);
+});

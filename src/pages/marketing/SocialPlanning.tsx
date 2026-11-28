@@ -46,12 +46,13 @@ import {
     ChatGptIcon,
     FacebookIcon,
     ManageConnectionsModal,
+    renderPlatformIcon,
     SocialConnectionsGrid,
     SocialNetworkBadge,
 } from '../../components/social/SocialBrandKit';
 import { PostLivePreview } from '../../components/social/PostLivePreview';
 import { PlanningAnalyticsTab } from '../../components/social/PlanningAnalyticsTab';
-import { pickDistinctPlatformAccounts } from '../../lib/socialBrandMatcher';
+import { groupSocialBrands, pickDistinctPlatformAccounts } from '../../lib/socialBrandMatcher';
 
 type PlanningTab = 'calendar' | 'list' | 'deleted' | 'analytics' | 'connections';
 type CalendarMode = 'hourly' | 'cards';
@@ -227,6 +228,30 @@ export default function SocialPlanning() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [lineFilter, setLineFilter] = useState<string>('all');
     const [accountFilter, setAccountFilter] = useState<string>('all');
+    const [selectedBrandId, setSelectedBrandId] = useState<string>('all');
+    const [showBrandMenu, setShowBrandMenu] = useState(false);
+    const [failedAvatarUrls, setFailedAvatarUrls] = useState<Record<string, boolean>>({});
+
+    const brandGroups = useMemo(() => groupSocialBrands(accounts), [accounts]);
+    const activeBrand = useMemo(
+        () => brandGroups.find((b) => b.id === selectedBrandId) || null,
+        [brandGroups, selectedBrandId],
+    );
+    const activeSingleAccount = useMemo(
+        () => (accountFilter !== 'all' ? publishableAccounts.find((a) => a.account_id === accountFilter) || null : null),
+        [accountFilter, publishableAccounts],
+    );
+    const brandPostCounts = useMemo(() => {
+        const map: Record<string, number> = {};
+        for (const b of brandGroups) {
+            const ids = new Set(b.publishableAccountIds);
+            map[b.id] = posts.filter((p) => {
+                const targets = Array.isArray(p.target_account_ids) ? p.target_account_ids : [];
+                return targets.some((t) => ids.has(t.account_id));
+            }).length;
+        }
+        return map;
+    }, [brandGroups, posts]);
 
     // List bulk actions & row menu
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -312,14 +337,24 @@ export default function SocialPlanning() {
         loadAll();
     }, [loadAll]);
 
-    // Close menus when clicking outside
+    // Close menus when clicking outside or pressing Escape
     useEffect(() => {
         const handler = () => {
             setOpenRowMenuId(null);
             setShowBulkMenu(false);
         };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setShowBrandMenu(false);
+                setShowFiltersPopover(false);
+            }
+        };
         window.addEventListener('click', handler);
-        return () => window.removeEventListener('click', handler);
+        window.addEventListener('keydown', onKey);
+        return () => {
+            window.removeEventListener('click', handler);
+            window.removeEventListener('keydown', onKey);
+        };
     }, []);
 
     const handleSetDefaultAccount = async (account: SocialAccount) => {
@@ -443,6 +478,23 @@ export default function SocialPlanning() {
         } else {
             setFormScheduledLocal(toDatetimeLocalValue());
         }
+        const scopedTargets = activeSingleAccount?.account_id
+            ? [
+                  {
+                      platform: activeSingleAccount.platform,
+                      account_id: activeSingleAccount.account_id,
+                      account_name: activeSingleAccount.display_name || activeSingleAccount.account_name,
+                  },
+              ]
+            : activeBrand
+            ? activeBrand.publishableAccounts
+                  .filter((a) => a.account_id)
+                  .map((a) => ({
+                      platform: a.platform,
+                      account_id: a.account_id!,
+                      account_name: a.display_name || a.account_name,
+                  }))
+            : [];
         const defaultTargets = publishableAccounts
             .filter((a) => a.is_default && a.account_id)
             .map((a) => ({
@@ -451,7 +503,9 @@ export default function SocialPlanning() {
                 account_name: a.display_name || a.account_name,
             }));
         setFormSelectedAccounts(
-            defaultTargets.length > 0
+            scopedTargets.length > 0
+                ? scopedTargets
+                : defaultTargets.length > 0
                 ? defaultTargets
                 : publishableAccounts[0]?.account_id
                 ? [
@@ -713,9 +767,12 @@ export default function SocialPlanning() {
         return posts.filter((p) => {
             if (statusFilter !== 'all' && p.status !== statusFilter) return false;
             if (lineFilter !== 'all' && (p.editorial_line || 'General') !== lineFilter) return false;
+            const targets = Array.isArray(p.target_account_ids) ? p.target_account_ids : [];
             if (accountFilter !== 'all') {
-                const targets = Array.isArray(p.target_account_ids) ? p.target_account_ids : [];
                 if (!targets.some((t) => t.account_id === accountFilter)) return false;
+            } else if (activeBrand) {
+                const brandIds = new Set(activeBrand.publishableAccountIds);
+                if (!targets.some((t) => brandIds.has(t.account_id))) return false;
             }
             if (term) {
                 const hay = [
@@ -730,7 +787,7 @@ export default function SocialPlanning() {
             }
             return true;
         });
-    }, [posts, searchTerm, statusFilter, lineFilter, accountFilter]);
+    }, [posts, searchTerm, statusFilter, lineFilter, accountFilter, activeBrand]);
 
     const weekDays = useMemo(() => {
         return Array.from({ length: 7 }, (_, idx) => {
@@ -911,34 +968,311 @@ export default function SocialPlanning() {
                                 <span>{svTimeFormatted} · El Salvador (-06:00)</span>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setShowConnectionsModal(true)}
-                                className="inline-flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                                title={
-                                    accounts.length > 0
-                                        ? `Cuentas conectadas: ${accounts.map((a) => `${a.platform} (${a.display_name || a.account_name || a.id})`).join(', ')}`
-                                        : 'Gestionar conexiones de redes'
-                                }
-                            >
-                                <div className="flex -space-x-1.5">
-                                    {pickDistinctPlatformAccounts(accounts, 4).map((acc) => (
-                                        <span
-                                            key={acc.id}
-                                            className="inline-flex shrink-0"
+                            {/* Global Metricool-Style Brand & Connected Pages Switcher */}
+                            <div className="relative">
+                                {(() => {
+                                    const activeAvatarUrl = activeBrand
+                                        ? activeBrand.avatarUrls.find((u) => !failedAvatarUrls[u]) || null
+                                        : activeSingleAccount?.avatar_url && !failedAvatarUrls[activeSingleAccount.avatar_url]
+                                        ? activeSingleAccount.avatar_url
+                                        : null;
+                                    const triggerLabel = activeSingleAccount
+                                        ? activeSingleAccount.display_name || activeSingleAccount.account_name || activeSingleAccount.platform
+                                        : activeBrand
+                                        ? activeBrand.name
+                                        : 'Todas las marcas';
+                                    const triggerSub = activeSingleAccount
+                                        ? activeSingleAccount.platform
+                                        : activeBrand
+                                        ? `${activeBrand.publishableAccounts.length} red(es)`
+                                        : `${publishableAccounts.length} ${publishableAccounts.length === 1 ? 'red' : 'redes'}`;
+                                    const initials =
+                                        triggerLabel
+                                            .split(/\s+/)
+                                            .filter(Boolean)
+                                            .slice(0, 2)
+                                            .map((w) => w[0]?.toUpperCase() || '')
+                                            .join('') || 'AR';
+
+                                    return (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowBrandMenu((v) => !v)}
+                                            aria-expanded={showBrandMenu}
+                                            className={`inline-flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-xl border bg-white shadow-2xs transition cursor-pointer ${
+                                                showBrandMenu
+                                                    ? 'border-slate-400 ring-2 ring-slate-900/5'
+                                                    : activeBrand || activeSingleAccount
+                                                    ? 'border-indigo-200/90 bg-indigo-50/40 hover:bg-indigo-50/70'
+                                                    : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                            }`}
+                                            title="Cambiar marca o filtrar por página conectada"
                                         >
-                                            <SocialNetworkBadge
-                                                platform={acc.platform}
-                                                size="xs"
-                                                title={`${acc.platform}: ${acc.display_name || acc.account_name || ''}`}
+                                            {activeBrand || activeSingleAccount ? (
+                                                activeAvatarUrl ? (
+                                                    <img
+                                                        src={activeAvatarUrl}
+                                                        alt={triggerLabel}
+                                                        onError={() =>
+                                                            setFailedAvatarUrls((prev) => ({
+                                                                ...prev,
+                                                                [activeAvatarUrl]: true,
+                                                            }))
+                                                        }
+                                                        className="w-6 h-6 rounded-lg object-cover border border-slate-200 shrink-0"
+                                                    />
+                                                ) : (
+                                                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white text-[9.5px] font-bold flex items-center justify-center shrink-0">
+                                                        {initials}
+                                                    </span>
+                                                )
+                                            ) : (
+                                                <div className="flex -space-x-1.5 shrink-0">
+                                                    {pickDistinctPlatformAccounts(accounts, 4).map((acc) => (
+                                                        <span key={acc.id} className="inline-flex shrink-0">
+                                                            <SocialNetworkBadge
+                                                                platform={acc.platform}
+                                                                size="xs"
+                                                                title={`${acc.platform}: ${acc.display_name || acc.account_name || ''}`}
+                                                            />
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="text-left min-w-0 leading-tight hidden sm:block">
+                                                <div className="text-[11.5px] font-bold text-slate-900 max-w-[136px] truncate">
+                                                    {triggerLabel}
+                                                </div>
+                                                <div className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                                                    {activeBrand &&
+                                                        activeBrand.platforms.slice(0, 4).map((p) => (
+                                                            <span key={p} className="inline-flex shrink-0">
+                                                                {renderPlatformIcon(p, 'w-3 h-3')}
+                                                            </span>
+                                                        ))}
+                                                    {activeSingleAccount && (
+                                                        <span className="inline-flex shrink-0">
+                                                            {renderPlatformIcon(activeSingleAccount.platform, 'w-3 h-3')}
+                                                        </span>
+                                                    )}
+                                                    <span className="capitalize">{triggerSub}</span>
+                                                </div>
+                                            </div>
+                                            <span className="sm:hidden text-xs font-semibold text-slate-700">
+                                                {publishableAccounts.length} redes
+                                            </span>
+                                            <ChevronDown
+                                                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                                                    showBrandMenu ? 'rotate-180 text-slate-700' : ''
+                                                }`}
                                             />
-                                        </span>
-                                    ))}
-                                </div>
-                                <span className="text-xs font-medium text-slate-700">
-                                    {publishableAccounts.length} {publishableAccounts.length === 1 ? 'red' : 'redes'}
-                                </span>
-                            </button>
+                                        </button>
+                                    );
+                                })()}
+
+                                {showBrandMenu && (
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-30"
+                                            onClick={() => setShowBrandMenu(false)}
+                                        />
+                                        <div className="absolute right-0 top-full mt-2 w-[356px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.16)] overflow-hidden z-40 animate-in fade-in slide-in-from-top-2">
+                                            {/* Top Action Card — Metricool "Add brand" pattern */}
+                                            <div className="p-2.5 border-b border-slate-100">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setShowBrandMenu(false);
+                                                        setShowConnectionsModal(true);
+                                                    }}
+                                                    className="w-full flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 hover:bg-indigo-50/60 hover:border-indigo-200 transition text-left cursor-pointer group"
+                                                >
+                                                    <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                        <Plus className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-[12.5px] font-bold text-slate-900">
+                                                            Administrar o conectar cuentas
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-500">
+                                                            {publishableAccounts.length} red(es) activas · {metaAdsAccounts.length} Meta Ads
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0" />
+                                                </button>
+                                            </div>
+
+                                            {/* Reset All Brands Row */}
+                                            <div className="border-b border-slate-100">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedBrandId('all');
+                                                        setAccountFilter('all');
+                                                        setShowBrandMenu(false);
+                                                    }}
+                                                    className={`w-full px-3.5 py-2.5 flex items-center justify-between text-left transition cursor-pointer border-l-[3px] ${
+                                                        selectedBrandId === 'all' && accountFilter === 'all'
+                                                            ? 'border-l-slate-900 bg-slate-50/90'
+                                                            : 'border-l-transparent hover:bg-slate-50/60'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <div className="flex -space-x-1.5 shrink-0">
+                                                            {pickDistinctPlatformAccounts(accounts, 3).map((acc) => (
+                                                                <span key={acc.id} className="inline-flex shrink-0">
+                                                                    <SocialNetworkBadge platform={acc.platform} size="xs" />
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="text-[12.5px] font-bold text-slate-900">
+                                                                Todas las marcas y redes
+                                                            </div>
+                                                            <div className="text-[10.5px] text-slate-400">
+                                                                {posts.length} publicación(es) en Planning
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {selectedBrandId === 'all' && accountFilter === 'all' && (
+                                                        <Check className="w-4 h-4 text-slate-900 shrink-0" />
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {/* Connected Brand Clusters */}
+                                            <div className="px-3.5 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                Marcas conectadas ({brandGroups.length})
+                                            </div>
+                                            <div className="max-h-[245px] overflow-y-auto divide-y divide-slate-100">
+                                                {brandGroups.map((brand) => {
+                                                    const isActive = selectedBrandId === brand.id && accountFilter === 'all';
+                                                    const rowAvatarUrl =
+                                                        brand.avatarUrls.find((u) => !failedAvatarUrls[u]) || null;
+                                                    const initials =
+                                                        brand.name
+                                                            .split(/\s+/)
+                                                            .filter(Boolean)
+                                                            .slice(0, 2)
+                                                            .map((w) => w[0]?.toUpperCase() || '')
+                                                            .join('') || 'AR';
+                                                    const count = brandPostCounts[brand.id] || 0;
+                                                    return (
+                                                        <button
+                                                            key={brand.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedBrandId(brand.id);
+                                                                setAccountFilter('all');
+                                                                setShowBrandMenu(false);
+                                                            }}
+                                                            className={`w-full px-3.5 py-2.5 flex items-center gap-3 text-left transition cursor-pointer border-l-[3px] ${
+                                                                isActive
+                                                                    ? 'border-l-slate-900 bg-slate-50/90'
+                                                                    : 'border-l-transparent hover:bg-slate-50/60'
+                                                            }`}
+                                                        >
+                                                            {rowAvatarUrl ? (
+                                                                <img
+                                                                    src={rowAvatarUrl}
+                                                                    alt={brand.name}
+                                                                    onError={() =>
+                                                                        setFailedAvatarUrls((prev) => ({
+                                                                            ...prev,
+                                                                            [rowAvatarUrl]: true,
+                                                                        }))
+                                                                    }
+                                                                    className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
+                                                                />
+                                                            ) : (
+                                                                <div className="w-9 h-9 rounded-xl bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                                                                    {initials}
+                                                                </div>
+                                                            )}
+
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-[12.5px] font-bold text-slate-900 truncate">
+                                                                    {brand.name}
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 mt-1">
+                                                                    {brand.accounts.map((acc) => (
+                                                                        <span
+                                                                            key={acc.id}
+                                                                            title={`${acc.platform}: ${acc.display_name || acc.account_name || ''}`}
+                                                                            className="inline-flex shrink-0"
+                                                                        >
+                                                                            {renderPlatformIcon(acc.platform, 'w-3.5 h-3.5')}
+                                                                        </span>
+                                                                    ))}
+                                                                    <span className="text-[10.5px] text-slate-400 truncate ml-0.5">
+                                                                        · {count} {count === 1 ? 'post' : 'posts'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {isActive && <Check className="w-4 h-4 text-slate-900 shrink-0" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Quick Per-Page Chips */}
+                                            {publishableAccounts.length > 0 && (
+                                                <div className="px-3.5 py-2.5 bg-slate-50/80 border-t border-slate-100 space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                            Filtrar por página ({publishableAccounts.length})
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setShowBrandMenu(false);
+                                                                setActiveTab('connections');
+                                                            }}
+                                                            className="text-[11px] font-semibold text-[#0081FB] hover:underline cursor-pointer"
+                                                        >
+                                                            Conexiones →
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5 max-h-[132px] overflow-y-auto">
+                                                        {publishableAccounts
+                                                            .filter((acc) => acc.account_id)
+                                                            .map((acc) => {
+                                                                const name = acc.display_name || acc.account_name || acc.platform;
+                                                                const chipActive = accountFilter === acc.account_id;
+                                                                return (
+                                                                    <button
+                                                                        key={acc.id}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setSelectedBrandId('all');
+                                                                            setAccountFilter(
+                                                                                chipActive ? 'all' : acc.account_id!,
+                                                                            );
+                                                                            setShowBrandMenu(false);
+                                                                        }}
+                                                                        title={`Filtrar calendario por ${acc.platform}: ${name}`}
+                                                                        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] font-medium max-w-[156px] transition cursor-pointer ${
+                                                                            chipActive
+                                                                                ? 'bg-slate-900 border-slate-900 text-white'
+                                                                                : 'bg-white border-slate-200/80 text-slate-700 hover:border-slate-300'
+                                                                        }`}
+                                                                    >
+                                                                        <span className="inline-flex shrink-0">
+                                                                            {renderPlatformIcon(acc.platform, 'w-3.5 h-3.5')}
+                                                                        </span>
+                                                                        <span className="truncate">{name}</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
 
                             <button
                                 type="button"
@@ -1134,62 +1468,110 @@ export default function SocialPlanning() {
                                 </button>
 
                                 {showFiltersPopover && (
-                                    <div className="absolute right-0 mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-30 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-bold text-slate-900">Filtros</span>
-                                            {activeFiltersCount > 0 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setLineFilter('all');
-                                                        setAccountFilter('all');
-                                                    }}
-                                                    className="text-[11px] font-medium text-indigo-600 hover:underline"
-                                                >
-                                                    Limpiar
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                                                Línea editorial
-                                            </label>
-                                            <select
-                                                value={lineFilter}
-                                                onChange={(e) => setLineFilter(e.target.value)}
-                                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800"
-                                            >
-                                                <option value="all">Todas las líneas</option>
-                                                {EDITORIAL_LINES.map((l) => (
-                                                    <option key={l} value={l}>
-                                                        {l}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                                                Página o cuenta destino
-                                            </label>
-                                            <select
-                                                value={accountFilter}
-                                                onChange={(e) => setAccountFilter(e.target.value)}
-                                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800"
-                                            >
-                                                <option value="all">Todas las cuentas</option>
-                                                {accounts
-                                                    .filter((a) => a.account_id)
-                                                    .map((a) => (
-                                                        <option
-                                                            key={`${a.platform}-${a.account_id}`}
-                                                            value={a.account_id!}
+                                    <>
+                                        <div
+                                            className="fixed inset-0 z-20"
+                                            onClick={() => setShowFiltersPopover(false)}
+                                        />
+                                        <div className="absolute right-0 mt-1.5 w-80 max-w-[calc(100vw-2rem)] bg-white border border-slate-200/90 rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.16)] p-4 z-30 space-y-3.5 animate-in fade-in slide-in-from-top-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-slate-900">Filtros de Planning</span>
+                                                {(activeFiltersCount > 0 || selectedBrandId !== 'all') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setLineFilter('all');
+                                                            setAccountFilter('all');
+                                                            setSelectedBrandId('all');
+                                                        }}
+                                                        className="text-[11px] font-semibold text-indigo-600 hover:underline cursor-pointer"
+                                                    >
+                                                        Limpiar
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                                                    Línea editorial
+                                                </span>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setLineFilter('all')}
+                                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                                                            lineFilter === 'all'
+                                                                ? 'bg-slate-900 text-white border-slate-900'
+                                                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                                        }`}
+                                                    >
+                                                        Todas
+                                                    </button>
+                                                    {EDITORIAL_LINES.map((l) => (
+                                                        <button
+                                                            key={l}
+                                                            type="button"
+                                                            onClick={() => setLineFilter(lineFilter === l ? 'all' : l)}
+                                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                                                                lineFilter === l
+                                                                    ? 'bg-slate-900 text-white border-slate-900'
+                                                                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                                            }`}
                                                         >
-                                                            {a.platform.toUpperCase()} · {a.display_name || a.account_name}
-                                                        </option>
+                                                            {l}
+                                                        </button>
                                                     ))}
-                                            </select>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                                                <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                                                    Página o canal destino
+                                                </span>
+                                                <div className="max-h-48 overflow-y-auto space-y-1 pr-0.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setAccountFilter('all')}
+                                                        className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between text-xs transition cursor-pointer ${
+                                                            accountFilter === 'all'
+                                                                ? 'bg-slate-100 text-slate-900 font-semibold'
+                                                                : 'text-slate-600 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        <span>Todas las cuentas</span>
+                                                        {accountFilter === 'all' && <Check className="w-3.5 h-3.5 text-slate-900" />}
+                                                    </button>
+                                                    {publishableAccounts
+                                                        .filter((a) => a.account_id)
+                                                        .map((a) => {
+                                                            const active = accountFilter === a.account_id;
+                                                            const name = a.display_name || a.account_name || a.platform;
+                                                            return (
+                                                                <button
+                                                                    key={`${a.platform}-${a.account_id}`}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedBrandId('all');
+                                                                        setAccountFilter(active ? 'all' : a.account_id!);
+                                                                    }}
+                                                                    className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between gap-2 text-xs transition cursor-pointer ${
+                                                                        active
+                                                                            ? 'bg-slate-900 text-white font-semibold'
+                                                                            : 'text-slate-700 hover:bg-slate-50'
+                                                                    }`}
+                                                                >
+                                                                    <span className="flex items-center gap-2 min-w-0">
+                                                                        <span className="inline-flex shrink-0">
+                                                                            {renderPlatformIcon(a.platform, 'w-3.5 h-3.5')}
+                                                                        </span>
+                                                                        <span className="truncate">{name}</span>
+                                                                    </span>
+                                                                    {active && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    </>
                                 )}
                             </div>
 
@@ -1211,6 +1593,41 @@ export default function SocialPlanning() {
                                 <span>Crear Post</span>
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {/* Active Brand / Page Filter Indicator Pill */}
+                {(activeTab === 'calendar' || activeTab === 'list') && (activeBrand || activeSingleAccount) && (
+                    <div className="flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[11px] font-semibold text-slate-400">Viendo marca/página:</span>
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-900 font-bold">
+                                {(activeBrand ? activeBrand.platforms : [activeSingleAccount!.platform]).map((p) => (
+                                    <span key={p} className="inline-flex shrink-0">
+                                        {renderPlatformIcon(p, 'w-3.5 h-3.5')}
+                                    </span>
+                                ))}
+                                <span className="truncate">
+                                    {activeSingleAccount
+                                        ? activeSingleAccount.display_name || activeSingleAccount.account_name
+                                        : activeBrand?.name}
+                                </span>
+                            </div>
+                            <span className="text-[11px] text-slate-500">
+                                ({filteredPosts.length} {filteredPosts.length === 1 ? 'publicación' : 'publicaciones'})
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSelectedBrandId('all');
+                                setAccountFilter('all');
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                        >
+                            <X className="w-3 h-3" />
+                            <span>Ver todas</span>
+                        </button>
                     </div>
                 )}
 
