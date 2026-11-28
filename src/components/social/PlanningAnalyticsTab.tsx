@@ -11,6 +11,7 @@ import {
     Loader2,
     Plus,
     RefreshCw,
+    X,
 } from 'lucide-react';
 import {
     Area,
@@ -541,10 +542,26 @@ export function PlanningAnalyticsTab({
                         {accountMenuOpen && (
                             <>
                                 <div
-                                    className="fixed inset-0 z-30"
+                                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] md:bg-transparent md:backdrop-blur-none z-[200] md:z-30 animate-ios-backdrop md:animate-none"
                                     onClick={() => setAccountMenuOpen(false)}
                                 />
-                                <div className="absolute right-0 top-full mt-2 w-[350px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.16)] overflow-hidden z-40 animate-in fade-in slide-in-from-top-2">
+                                <div className="fixed inset-x-0 bottom-0 max-h-[85dvh] z-[210] flex flex-col rounded-t-[28px] bg-white shadow-[0_-14px_44px_rgba(15,23,42,0.22)] ring-1 ring-slate-900/5 animate-ios-sheet-up overflow-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-0 md:inset-auto md:bottom-auto md:max-h-none md:absolute md:right-0 md:top-full md:mt-2 md:w-[350px] md:z-40 md:rounded-2xl md:border md:border-slate-200/90 md:shadow-[0_20px_50px_rgba(15,23,42,0.16)] md:ring-0 md:animate-none">
+                                    {/* Mobile iOS Sheet Grabber + Header */}
+                                    <div className="md:hidden pt-2.5 pb-1 flex justify-center shrink-0">
+                                        <span className="w-10 h-1.5 rounded-full bg-slate-300/90" />
+                                    </div>
+                                    <div className="md:hidden px-4 py-2 border-b border-slate-100 flex items-center justify-between shrink-0">
+                                        <span className="text-[15.5px] font-bold text-slate-900">Cuentas Meta Ads y redes</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAccountMenuOpen(false)}
+                                            aria-label="Cerrar selector de cuentas"
+                                            className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="flex-1 min-h-0 overflow-y-auto md:overflow-visible">
                                     {/* Top Action Card — Metricool "Add brand" pattern */}
                                     <div className="p-2.5 border-b border-slate-100">
                                         <button
@@ -704,6 +721,7 @@ export function PlanningAnalyticsTab({
                                             </div>
                                         </div>
                                     )}
+                                    </div>
                                 </div>
                             </>
                         )}

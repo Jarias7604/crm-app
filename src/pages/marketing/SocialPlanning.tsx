@@ -911,11 +911,11 @@ export default function SocialPlanning() {
     return (
         <div className="min-h-[calc(100vh-64px)] bg-[#F8FAFC] text-slate-900 flex flex-col">
             {/* TOP COMMERCIAL HEADER + SUB-TABS */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
+            <header className={`bg-white border-b border-slate-200 sticky top-0 ${showBrandMenu ? 'z-[220] md:z-40' : 'z-20'}`}>
                 <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
                         {/* Left: Clean Minimalist Underline Tabs */}
-                        <div className="flex items-center gap-1 sm:gap-5 overflow-x-auto">
+                        <div className="flex items-center gap-1 sm:gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             <Link
                                 to="/marketing/social"
                                 className="inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-slate-700 pb-3 pr-2 border-r border-slate-200 mr-1 whitespace-nowrap"
@@ -1074,10 +1074,26 @@ export default function SocialPlanning() {
                                 {showBrandMenu && (
                                     <>
                                         <div
-                                            className="fixed inset-0 z-30"
+                                            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] md:bg-transparent md:backdrop-blur-none z-[200] md:z-30 animate-ios-backdrop md:animate-none"
                                             onClick={() => setShowBrandMenu(false)}
                                         />
-                                        <div className="absolute right-0 top-full mt-2 w-[356px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.16)] overflow-hidden z-40 animate-in fade-in slide-in-from-top-2">
+                                        <div className="fixed inset-x-0 bottom-0 max-h-[85dvh] z-[210] flex flex-col rounded-t-[28px] bg-white shadow-[0_-14px_44px_rgba(15,23,42,0.22)] ring-1 ring-slate-900/5 animate-ios-sheet-up overflow-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pb-0 md:inset-auto md:bottom-auto md:max-h-none md:absolute md:right-0 md:top-full md:mt-2 md:w-[356px] md:z-40 md:rounded-2xl md:border md:border-slate-200/90 md:shadow-[0_20px_50px_rgba(15,23,42,0.16)] md:ring-0 md:animate-none">
+                                            {/* Mobile iOS Sheet Grabber + Header */}
+                                            <div className="md:hidden pt-2.5 pb-1 flex justify-center shrink-0">
+                                                <span className="w-10 h-1.5 rounded-full bg-slate-300/90" />
+                                            </div>
+                                            <div className="md:hidden px-4 py-2 border-b border-slate-100 flex items-center justify-between shrink-0">
+                                                <span className="text-[15.5px] font-bold text-slate-900">Marcas y redes</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowBrandMenu(false)}
+                                                    aria-label="Cerrar selector de marcas"
+                                                    className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            <div className="flex-1 min-h-0 overflow-y-auto md:overflow-visible">
                                             {/* Top Action Card — Metricool "Add brand" pattern */}
                                             <div className="p-2.5 border-b border-slate-100">
                                                 <button
@@ -1269,6 +1285,7 @@ export default function SocialPlanning() {
                                                     </div>
                                                 </div>
                                             )}
+                                            </div>
                                         </div>
                                     </>
                                 )}
@@ -1470,12 +1487,17 @@ export default function SocialPlanning() {
                                 {showFiltersPopover && (
                                     <>
                                         <div
-                                            className="fixed inset-0 z-20"
+                                            className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] md:bg-transparent md:backdrop-blur-none z-[200] md:z-20 animate-ios-backdrop md:animate-none"
                                             onClick={() => setShowFiltersPopover(false)}
                                         />
-                                        <div className="absolute right-0 mt-1.5 w-80 max-w-[calc(100vw-2rem)] bg-white border border-slate-200/90 rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.16)] p-4 z-30 space-y-3.5 animate-in fade-in slide-in-from-top-2">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-bold text-slate-900">Filtros de Planning</span>
+                                        <div className="fixed inset-x-0 bottom-0 max-h-[82dvh] z-[210] flex flex-col rounded-t-[28px] bg-white shadow-[0_-14px_44px_rgba(15,23,42,0.22)] ring-1 ring-slate-900/5 animate-ios-sheet-up overflow-hidden pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-0 md:inset-auto md:bottom-auto md:max-h-none md:absolute md:right-0 md:mt-1.5 md:w-80 md:z-30 md:rounded-2xl md:border md:border-slate-200/90 md:shadow-[0_20px_50px_rgba(15,23,42,0.16)] md:ring-0 md:animate-none">
+                                            <div className="md:hidden pt-2.5 pb-1 flex justify-center shrink-0">
+                                                <span className="w-10 h-1.5 rounded-full bg-slate-300/90" />
+                                            </div>
+                                            <div className="flex-1 min-h-0 overflow-y-auto md:overflow-visible p-4 space-y-3.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-[15px] md:text-xs font-bold text-slate-900">Filtros de Planning</span>
+                                                <div className="flex items-center gap-2">
                                                 {(activeFiltersCount > 0 || selectedBrandId !== 'all') && (
                                                     <button
                                                         type="button"
@@ -1489,6 +1511,15 @@ export default function SocialPlanning() {
                                                         Limpiar
                                                     </button>
                                                 )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowFiltersPopover(false)}
+                                                    aria-label="Cerrar filtros"
+                                                    className="md:hidden w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                                </div>
                                             </div>
                                             <div className="space-y-1.5">
                                                 <span className="block text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
@@ -1569,6 +1600,7 @@ export default function SocialPlanning() {
                                                             );
                                                         })}
                                                 </div>
+                                            </div>
                                             </div>
                                         </div>
                                     </>
