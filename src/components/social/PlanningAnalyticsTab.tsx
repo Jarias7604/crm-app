@@ -618,216 +618,217 @@ export function PlanningAnalyticsTab({
                         </div>
                     </div>
 
-                    {/* SIGNATURE METRICOOL CHART CARD */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-6">
-                        <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-                            <div className="flex flex-wrap items-center gap-3">
-                                <h3 className="text-sm font-bold text-slate-900">
-                                    {chartMode === 'roi'
-                                        ? 'Inversión Meta Ads vs Ventas Ganadas'
-                                        : 'Inversión diaria vs Formularios y Leads CRM'}
-                                </h3>
-                                <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100">
-                                    <button
-                                        type="button"
-                                        onClick={() => setChartMode('roi')}
-                                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
-                                            chartMode === 'roi'
-                                                ? 'bg-white text-slate-900 shadow-2xs'
-                                                : 'text-slate-500 hover:text-slate-800'
-                                        }`}
-                                    >
-                                        Inversión vs Ganado ($)
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setChartMode('leads')}
-                                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
-                                            chartMode === 'leads'
-                                                ? 'bg-white text-slate-900 shadow-2xs'
-                                                : 'text-slate-500 hover:text-slate-800'
-                                        }`}
-                                    >
-                                        Leads &amp; Formularios
-                                    </button>
+                    {/* UNIFIED SINGLE-ROW EXECUTIVE ANALYTICS: CHART + COHORTE + EMBUDO */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                        <div className="lg:col-span-12 xl:col-span-6 bg-white border border-slate-200/80 rounded-2xl p-5 flex flex-col">
+                            <div className="flex flex-wrap items-start justify-between gap-2.5 mb-4">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <h3 className="text-sm font-bold text-slate-900">
+                                        {chartMode === 'roi'
+                                            ? 'Inversión Meta Ads vs Ventas Ganadas'
+                                            : 'Inversión diaria vs Formularios y Leads CRM'}
+                                    </h3>
+                                    <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => setChartMode('roi')}
+                                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                                                chartMode === 'roi'
+                                                    ? 'bg-white text-slate-900 shadow-2xs'
+                                                    : 'text-slate-500 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            Inversión vs Ganado ($)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setChartMode('leads')}
+                                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                                                chartMode === 'leads'
+                                                    ? 'bg-white text-slate-900 shadow-2xs'
+                                                    : 'text-slate-500 hover:text-slate-800'
+                                            }`}
+                                        >
+                                            Leads &amp; Formularios
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* METRICOOL-STYLE TOP-RIGHT PASTEL BADGES */}
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <div className="px-2.5 py-1 rounded-lg bg-[#DBEAFE]/70 text-center">
+                                        <div className="text-xs font-black text-blue-800 leading-tight">
+                                            {fmtUsd(summary.spend)}
+                                        </div>
+                                        <div className="text-[9.5px] font-semibold text-blue-700/80">Inversión Ads</div>
+                                    </div>
+                                    <div className="px-2.5 py-1 rounded-lg bg-[#D1FAE5]/75 text-center">
+                                        <div className="text-xs font-black text-emerald-800 leading-tight">
+                                            {fmtUsd(roiMetrics.revenue)}
+                                        </div>
+                                        <div className="text-[9.5px] font-semibold text-emerald-700/80">Ganado CRM</div>
+                                    </div>
+                                    <div className="px-2.5 py-1 rounded-lg bg-[#FEF3C7]/85 text-center">
+                                        <div className="text-xs font-black text-amber-900 leading-tight">
+                                            {cohortSummary.same_period_deals} / {cohortSummary.previous_period_deals}
+                                        </div>
+                                        <div className="text-[9.5px] font-semibold text-amber-800/80">Mismo mes / Ant.</div>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* METRICOOL-STYLE TOP-RIGHT PASTEL BADGES */}
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="px-3.5 py-1.5 rounded-xl bg-[#DBEAFE]/70 text-center">
-                                    <div className="text-sm font-black text-blue-800 leading-tight">
-                                        {fmtUsd(summary.spend)}
-                                    </div>
-                                    <div className="text-[10px] font-semibold text-blue-700/80">Inversión Ads</div>
+                            {loading ? (
+                                <div className="flex-1 min-h-[248px] flex items-center justify-center text-xs text-slate-400 gap-2">
+                                    <Loader2 className="w-4 h-4 animate-spin" /> Cargando serie diaria…
                                 </div>
-                                <div className="px-3.5 py-1.5 rounded-xl bg-[#D1FAE5]/75 text-center">
-                                    <div className="text-sm font-black text-emerald-800 leading-tight">
-                                        {fmtUsd(roiMetrics.revenue)}
-                                    </div>
-                                    <div className="text-[10px] font-semibold text-emerald-700/80">Ganado CRM</div>
+                            ) : dailyChartData.length === 0 ? (
+                                <div className="flex-1 min-h-[248px] flex items-center justify-center text-xs text-slate-400">
+                                    Sin actividad registrada entre {since} y {until}.
                                 </div>
-                                <div className="px-3.5 py-1.5 rounded-xl bg-[#FEF3C7]/85 text-center">
-                                    <div className="text-sm font-black text-amber-900 leading-tight">
-                                        {cohortSummary.same_period_deals} / {cohortSummary.previous_period_deals}
-                                    </div>
-                                    <div className="text-[10px] font-semibold text-amber-800/80">Mismo mes / Ant.</div>
+                            ) : chartMode === 'roi' ? (
+                                <div className="flex-1 min-h-[248px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={dailyChartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="spendCalmGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#0081FB" stopOpacity={0.18} />
+                                                    <stop offset="95%" stopColor="#0081FB" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis
+                                                dataKey="date"
+                                                minTickGap={24}
+                                                tick={{ fontSize: 10.5, fill: '#94a3b8' }}
+                                                tickFormatter={(v) => String(v).slice(5)}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 10.5, fill: '#94a3b8' }}
+                                                tickFormatter={(v) => `$${v}`}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <Tooltip
+                                                formatter={(value: any, name: any) => [
+                                                    fmtUsd(Number(value) || 0),
+                                                    name,
+                                                ]}
+                                            />
+                                            <Bar
+                                                dataKey="won_amount"
+                                                name="Ganado CRM ($)"
+                                                fill="#10B981"
+                                                radius={[5, 5, 0, 0]}
+                                                maxBarSize={20}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="spend"
+                                                name="Inversión Meta ($)"
+                                                stroke="#0081FB"
+                                                fill="url(#spendCalmGrad)"
+                                                strokeWidth={2}
+                                            />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="flex-1 min-h-[248px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={dailyChartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="spendLeadsGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#0081FB" stopOpacity={0.18} />
+                                                    <stop offset="95%" stopColor="#0081FB" stopOpacity={0} />
+                                                </linearGradient>
+                                                <linearGradient id="crmLeadsGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
+                                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis
+                                                dataKey="date"
+                                                minTickGap={24}
+                                                tick={{ fontSize: 10.5, fill: '#94a3b8' }}
+                                                tickFormatter={(v) => String(v).slice(5)}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis yAxisId="left" tick={{ fontSize: 10.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                            <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10.5, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                            <Tooltip />
+                                            <Area
+                                                yAxisId="left"
+                                                type="monotone"
+                                                dataKey="spend"
+                                                name="Inversión ($)"
+                                                stroke="#0081FB"
+                                                fill="url(#spendLeadsGrad)"
+                                                strokeWidth={2}
+                                            />
+                                            <Area
+                                                yAxisId="right"
+                                                type="monotone"
+                                                dataKey="crm_leads"
+                                                name="Leads CRM"
+                                                stroke="#10B981"
+                                                fill="url(#crmLeadsGrad)"
+                                                strokeWidth={2}
+                                            />
+                                            <Area
+                                                yAxisId="right"
+                                                type="monotone"
+                                                dataKey="meta_leads"
+                                                name="Formularios Meta"
+                                                stroke="#8B5CF6"
+                                                fill="none"
+                                                strokeWidth={2}
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
                         </div>
 
-                        {loading ? (
-                            <div className="h-64 flex items-center justify-center text-xs text-slate-400 gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin" /> Cargando serie diaria…
-                            </div>
-                        ) : dailyChartData.length === 0 ? (
-                            <div className="h-64 flex items-center justify-center text-xs text-slate-400">
-                                Sin actividad registrada entre {since} y {until}.
-                            </div>
-                        ) : chartMode === 'roi' ? (
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={dailyChartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="spendCalmGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#0081FB" stopOpacity={0.18} />
-                                                <stop offset="95%" stopColor="#0081FB" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis
-                                            dataKey="date"
-                                            tick={{ fontSize: 11, fill: '#94a3b8' }}
-                                            tickFormatter={(v) => String(v).slice(5)}
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <YAxis
-                                            tick={{ fontSize: 11, fill: '#94a3b8' }}
-                                            tickFormatter={(v) => `$${v}`}
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <Tooltip
-                                            formatter={(value: any, name: any) => [
-                                                fmtUsd(Number(value) || 0),
-                                                name,
-                                            ]}
-                                        />
-                                        <Bar
-                                            dataKey="won_amount"
-                                            name="Ganado CRM ($)"
-                                            fill="#10B981"
-                                            radius={[5, 5, 0, 0]}
-                                            maxBarSize={22}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="spend"
-                                            name="Inversión Meta ($)"
-                                            stroke="#0081FB"
-                                            fill="url(#spendCalmGrad)"
-                                            strokeWidth={2}
-                                        />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={dailyChartData} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="spendLeadsGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#0081FB" stopOpacity={0.18} />
-                                                <stop offset="95%" stopColor="#0081FB" stopOpacity={0} />
-                                            </linearGradient>
-                                            <linearGradient id="crmLeadsGrad" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
-                                                <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis
-                                            dataKey="date"
-                                            tick={{ fontSize: 11, fill: '#94a3b8' }}
-                                            tickFormatter={(v) => String(v).slice(5)}
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                                        <Tooltip />
-                                        <Area
-                                            yAxisId="left"
-                                            type="monotone"
-                                            dataKey="spend"
-                                            name="Inversión ($)"
-                                            stroke="#0081FB"
-                                            fill="url(#spendLeadsGrad)"
-                                            strokeWidth={2}
-                                        />
-                                        <Area
-                                            yAxisId="right"
-                                            type="monotone"
-                                            dataKey="crm_leads"
-                                            name="Leads CRM"
-                                            stroke="#10B981"
-                                            fill="url(#crmLeadsGrad)"
-                                            strokeWidth={2}
-                                        />
-                                        <Area
-                                            yAxisId="right"
-                                            type="monotone"
-                                            dataKey="meta_leads"
-                                            name="Formularios Meta"
-                                            stroke="#8B5CF6"
-                                            fill="none"
-                                            strokeWidth={2}
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* BOTTOM AIRY 2-COLUMN SUMMARY: COHORTE + EMBUDO */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                        <div className="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-6 flex flex-col justify-between space-y-5">
-                            <div className="flex items-center justify-between gap-2">
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-900">
-                                        Cohorte de Cierres &amp; Alcance Meta Ads
+                        <div className="lg:col-span-6 xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between gap-4">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                                        Cohorte &amp; Alcance Meta Ads
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">
-                                        Separa ventas que entraron y cerraron este mes vs leads de meses anteriores cerrados hoy
+                                    <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                        Este mes vs leads anteriores cerrados hoy
                                     </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setSubTab('sales')}
-                                    className="inline-flex items-center gap-1 text-xs font-semibold text-[#0081FB] hover:underline cursor-pointer shrink-0"
+                                    className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-[#0081FB] hover:underline cursor-pointer shrink-0 pt-0.5"
                                 >
-                                    Auditar fechas <ArrowUpRight className="w-3.5 h-3.5" />
+                                    Auditar <ArrowUpRight className="w-3.5 h-3.5" />
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2.5">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setCohortScope('same_period');
                                         setSubTab('sales');
                                     }}
-                                    className="text-left rounded-xl bg-emerald-50/70 hover:bg-emerald-50 p-4 transition cursor-pointer"
+                                    className="text-left rounded-xl bg-emerald-50/70 hover:bg-emerald-50 p-3 transition cursor-pointer"
                                 >
-                                    <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+                                    <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
                                         Ingresaron y cerraron aquí
                                     </div>
-                                    <div className="flex items-baseline justify-between mt-1.5">
-                                        <span className="text-2xl font-black text-slate-900">
+                                    <div className="flex items-baseline justify-between gap-2 mt-1">
+                                        <span className="text-xl font-black text-slate-900">
                                             {fmtUsd(cohortSummary.same_period_amount)}
                                         </span>
-                                        <span className="text-xs font-semibold text-emerald-700">
+                                        <span className="text-[11px] font-semibold text-emerald-700 shrink-0">
                                             {cohortSummary.same_period_deals} trato(s)
                                         </span>
                                     </div>
@@ -839,44 +840,44 @@ export function PlanningAnalyticsTab({
                                         setCohortScope('previous_period');
                                         setSubTab('sales');
                                     }}
-                                    className="text-left rounded-xl bg-amber-50/70 hover:bg-amber-50 p-4 transition cursor-pointer"
+                                    className="text-left rounded-xl bg-amber-50/70 hover:bg-amber-50 p-3 transition cursor-pointer"
                                 >
-                                    <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+                                    <div className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
                                         De mes anterior · cerrados aquí
                                     </div>
-                                    <div className="flex items-baseline justify-between mt-1.5">
-                                        <span className="text-2xl font-black text-slate-900">
+                                    <div className="flex items-baseline justify-between gap-2 mt-1">
+                                        <span className="text-xl font-black text-slate-900">
                                             {fmtUsd(cohortSummary.previous_period_amount)}
                                         </span>
-                                        <span className="text-xs font-semibold text-amber-800">
+                                        <span className="text-[11px] font-semibold text-amber-800 shrink-0">
                                             {cohortSummary.previous_period_deals} trato(s)
                                         </span>
                                     </div>
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 pt-3 border-t border-slate-100">
                                 <div>
-                                    <div className="text-[11px] text-slate-400 font-medium">Impresiones</div>
-                                    <div className="text-sm font-bold text-slate-900 mt-0.5">
+                                    <div className="text-[10.5px] text-slate-400 font-medium">Impresiones</div>
+                                    <div className="text-[13px] font-bold text-slate-900 mt-0.5 tabular-nums">
                                         {summary.impressions.toLocaleString()}
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-[11px] text-slate-400 font-medium">Alcance único</div>
-                                    <div className="text-sm font-bold text-slate-900 mt-0.5">
+                                    <div className="text-[10.5px] text-slate-400 font-medium">Alcance único</div>
+                                    <div className="text-[13px] font-bold text-slate-900 mt-0.5 tabular-nums">
                                         {summary.reach.toLocaleString()}
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-[11px] text-slate-400 font-medium">Clics · CTR</div>
-                                    <div className="text-sm font-bold text-slate-900 mt-0.5">
+                                    <div className="text-[10.5px] text-slate-400 font-medium">Clics · CTR</div>
+                                    <div className="text-[13px] font-bold text-slate-900 mt-0.5 tabular-nums">
                                         {summary.clicks.toLocaleString()} · {summary.ctr}%
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-[11px] text-slate-400 font-medium">CPC · Consumo IA</div>
-                                    <div className="text-sm font-bold text-slate-900 mt-0.5">
+                                    <div className="text-[10.5px] text-slate-400 font-medium">CPC · Consumo IA</div>
+                                    <div className="text-[13px] font-bold text-slate-900 mt-0.5 tabular-nums">
                                         {fmtUsd(summary.cpc)} ·{' '}
                                         <Link to="/leads/calificador-ia" className="text-[#4449AA] hover:underline">
                                             {fmtUsd(crm.ai_cost_usd, 4)}
@@ -886,19 +887,21 @@ export function PlanningAnalyticsTab({
                             </div>
                         </div>
 
-                        <div className="lg:col-span-5 bg-white border border-slate-200/80 rounded-2xl p-6 space-y-4">
+                        <div className="lg:col-span-6 xl:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-5 flex flex-col justify-between gap-4">
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Embudo Ads → CRM</h3>
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                    Conversión del período {since} al {until}
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {since} → {until}
                                 </p>
                             </div>
-                            <div className="space-y-3 pt-1">
+                            <div className="space-y-3.5 flex-1 flex flex-col justify-center">
                                 {funnelRows.map((row) => (
                                     <div key={row.label} className="space-y-1">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="font-medium text-slate-600">{row.label}</span>
-                                            <span className="font-bold text-slate-900">{row.value.toLocaleString()}</span>
+                                        <div className="flex items-center justify-between gap-2 text-[11.5px]">
+                                            <span className="font-medium text-slate-600 truncate">{row.label}</span>
+                                            <span className="font-bold text-slate-900 shrink-0 tabular-nums">
+                                                {row.value.toLocaleString()}
+                                            </span>
                                         </div>
                                         <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
                                             <div
