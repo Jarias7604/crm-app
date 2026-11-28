@@ -40,6 +40,8 @@ const sAlertas = loadShot('mobile_chat_alertas_centrado.png');
 const sFiltros = loadShot('mobile_chat_filtros.png');
 const sBridgeQr = loadShot('bridge_modal_qr_pairing.png');
 const sNoEnviados = loadShot('chat_no_enviados_reenviar.png');
+const sNuevoProspecto = loadShot('mobile_nuevo_prospecto.png');
+const sNuevaCotizacion = loadShot('mobile_nueva_cotizacion.png');
 
 const hdr = () => `
   <div class="top-rule">
@@ -49,11 +51,11 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.8 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.9 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const TOTAL_PAGES = 7;
+const TOTAL_PAGES = 8;
 
 const html = `<!DOCTYPE html>
 <html lang="es">
@@ -233,10 +235,10 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.8 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">27 de noviembre de 2026 (v1.8: Bottom Sheet estilo iOS Apple en Filtros con selector de Período Hoy/Semana/Mes, multi-selección de bandejas y día calendario exacto Hoy/Ayer)</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.9 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">27 de noviembre de 2026 (v1.9: Despeje de barra inferior iOS en + Nuevo → Nuevo Prospecto y Nueva Cotización para iPhone 16 [393×852] + mayor espacio de scroll en móvil)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
-        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav Liquid Glass, Bottom Sheet Filtros iOS, flujo 3 pasos en Leads (/support/chat) y recuperación Anti-Ban</td></tr>
+        <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav Liquid Glass, Bottom Sheet Filtros iOS, flujos + Nuevo sin traslapes y recuperación Anti-Ban</td></tr>
       </table>
 
       <h3 class="sub-h">Criterio de diseño por dispositivo (Producto)</h3>
@@ -518,6 +520,49 @@ const html = `<!DOCTYPE html>
     </div>
   </div>
   ${ftr(7, TOTAL_PAGES)}
+</section>
+
+<!-- PAGE 8: FLUJOS RÁPIDOS + NUEVO EN IPHONE 16 (393×852) -->
+<section class="page">
+  <div>
+    ${hdr()}
+    <div class="kicker">07 / FLUJOS RÁPIDOS + NUEVO EN IPHONE 16 (393×852)</div>
+    <h1 class="sec-h1">Nuevo Prospecto y Nueva Cotización sin traslapes en botones inferiores</h1>
+    <p class="lead-p">Al usar <strong>+ Nuevo</strong> en iPhone (<code>393×852</code>), los formularios enfocan la pantalla completa (<code>MobileNav</code> se oculta temporalmente) y agregan amplio margen inferior de scroll para operar <strong>Crear Prospecto</strong> y <strong>Siguiente</strong> sin obstrucciones.</p>
+
+    <div class="two-phones">
+      <!-- Column 1: Nuevo Prospecto -->
+      <div class="phone-col">
+        <div class="step-hdr" style="text-align:center;"><span class="num">07 ·</span> + Nuevo → Nuevo Prospecto</div>
+        <div class="phone-frame" style="margin-top: 16px;">
+          <img src="${sNuevoProspecto}" alt="Modal Nuevo Prospecto en iPhone 16 sin barra flotante encima" />
+          <div class="callout-box" style="left:3.5%;top:92.0%;width:93.0%;height:6.4%;"><span class="callout-tag">1. Botón CREAR PROSPECTO 100% libre</span></div>
+        </div>
+        <div class="fig-cap"><strong>Figura 9.</strong> Portal en <code>100dvh</code> con espacio extra bajo <em>Notas de acción</em> y barra dock oculta hasta cerrar.</div>
+      </div>
+
+      <!-- Column 2: Nueva Cotización -->
+      <div class="phone-col">
+        <div class="step-hdr" style="text-align:center;"><span class="num">08 ·</span> + Nuevo → Nueva Cotización</div>
+        <div class="phone-frame" style="margin-top: 16px;">
+          <img src="${sNuevaCotizacion}" alt="Asistente Nueva Cotización en iPhone 16 con botón Siguiente despejado" />
+          <div class="callout-box" style="left:2.5%;top:92.2%;width:95.0%;height:6.4%;"><span class="callout-tag">2. Barra fija Siguiente sin dock encima</span></div>
+        </div>
+        <div class="fig-cap"><strong>Figura 10.</strong> Barra fija en <code>bottom-0</code>, botón <em>← Volver</em> superior y scroll holgado bajo el último campo.</div>
+      </div>
+    </div>
+
+    <table class="inst" style="margin-top: 10px; margin-bottom: 0;">
+      <thead>
+        <tr><th style="width:32%;">Regla de arquitectura móvil</th><th style="width:68%;">Garantía en iPhone 16 (393×852) y pantallas táctiles</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Jerarquía de capas (<code>z-index</code>)</strong></td><td>El dock <code>MobileNav</code> usa <code>z-40</code> (debajo de modales <code>z-50+</code>) y se oculta automáticamente en <code>CreateLeadFullscreen</code> y <code>CotizadorPro</code>.</td></tr>
+        <tr><td><strong>Espacio extra de scroll inferior</strong></td><td>Margen inferior ampliado globalmente (<code>pb-36</code> / <code>pb-48</code> + <code>safe-area-inset-bottom</code>) en chats, leads y cotizaciones para navegar hasta el fondo con holgura.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  ${ftr(8, TOTAL_PAGES)}
 </section>
 
 </body>
