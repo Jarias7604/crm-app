@@ -133,6 +133,7 @@ export function PlanningAnalyticsTab({
     const [until, setUntil] = useState(initialRange.until);
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
     const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+    const [failedAvatarUrls, setFailedAvatarUrls] = useState<Record<string, boolean>>({});
     const [sourceScope, setSourceScope] = useState<SourceScope>('all');
     const [cohortScope, setCohortScope] = useState<CohortScope>('all');
     const [chartMode, setChartMode] = useState<'roi' | 'leads'>('roi');
@@ -245,6 +246,9 @@ export function PlanningAnalyticsTab({
         () => matchBrandSocialAccounts(activeBrandName, publishableAccounts),
         [activeBrandName, publishableAccounts],
     );
+    const activeTriggerAvatarUrl =
+        activeBrandMatch.matched.find((a) => Boolean(a.avatar_url) && !failedAvatarUrls[a.avatar_url!])?.avatar_url ||
+        (activeBrandMatch.avatarUrl && !failedAvatarUrls[activeBrandMatch.avatarUrl] ? activeBrandMatch.avatarUrl : null);
 
     const cohortSummary = useMemo(() => {
         if (crm.cohort_summary) return crm.cohort_summary;
@@ -492,10 +496,11 @@ export function PlanningAnalyticsTab({
                             aria-expanded={accountMenuOpen}
                             title="Cambiar cuenta Meta Ads y ver páginas conectadas"
                         >
-                            {activeBrandMatch.avatarUrl ? (
+                            {activeTriggerAvatarUrl ? (
                                 <img
-                                    src={activeBrandMatch.avatarUrl}
+                                    src={activeTriggerAvatarUrl}
                                     alt={activeBrandName}
+                                    onError={() => setFailedAvatarUrls((prev) => ({ ...prev, [activeTriggerAvatarUrl]: true }))}
                                     className="w-7 h-7 rounded-lg object-cover border border-slate-200/80 shrink-0"
                                 />
                             ) : (
@@ -578,6 +583,10 @@ export function PlanningAnalyticsTab({
                                             adAccountOptions.map((acc) => {
                                                 const isActive = activeAdAccount?.account_id === acc.account_id;
                                                 const match = matchBrandSocialAccounts(acc.account_name, publishableAccounts);
+                                                const rowAvatarUrl =
+                                                    match.matched.find((a) => Boolean(a.avatar_url) && !failedAvatarUrls[a.avatar_url!])
+                                                        ?.avatar_url ||
+                                                    (match.avatarUrl && !failedAvatarUrls[match.avatarUrl] ? match.avatarUrl : null);
                                                 const initialsText =
                                                     acc.account_name
                                                         .split(/\s+/)
@@ -599,10 +608,16 @@ export function PlanningAnalyticsTab({
                                                                 : 'border-l-transparent hover:bg-slate-50/60'
                                                         }`}
                                                     >
-                                                        {match.avatarUrl ? (
+                                                        {rowAvatarUrl ? (
                                                             <img
-                                                                src={match.avatarUrl}
+                                                                src={rowAvatarUrl}
                                                                 alt={acc.account_name}
+                                                                onError={() =>
+                                                                    setFailedAvatarUrls((prev) => ({
+                                                                        ...prev,
+                                                                        [rowAvatarUrl]: true,
+                                                                    }))
+                                                                }
                                                                 className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
                                                             />
                                                         ) : (
@@ -670,7 +685,7 @@ export function PlanningAnalyticsTab({
                                                     Ver todas →
                                                 </button>
                                             </div>
-                                            <div className="flex flex-wrap gap-1.5 max-h-[84px] overflow-y-auto">
+                                            <div className="flex flex-wrap gap-1.5 max-h-[132px] overflow-y-auto">
                                                 {publishableAccounts.map((acc) => {
                                                     const name = acc.display_name || acc.account_name || acc.platform;
                                                     return (
