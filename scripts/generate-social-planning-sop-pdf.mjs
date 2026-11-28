@@ -177,7 +177,7 @@ const hdr = (code = 'SOP-COM-2026-04 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Marketing y Redes Sociales / Versión 1.7 · Planning + Selector Marca Metricool + Meta Ads ROI + Cohorte &amp; MCP</span>
+    <span>Marketing y Redes Sociales / Versión 1.8 · Planning + Selector Marca Calendario/Analytics + Meta Ads ROI + MCP</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -195,7 +195,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
       <div class="kicker" style="margin-top:24px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.7 · Selector Moderno de Marca/Cuenta Estilo Metricool + Íconos Oficiales y Páginas Conectadas + ROI</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.8 · Selector Moderno de Marca/Páginas Estilo Metricool en Calendario, Lista y Estadísticas + ROI</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">27 de noviembre de 2026</td></tr>
         <tr><td class="kv-key">URL Servidor MCP</td><td class="kv-val"><code>https://www.ariascrm.com/mcp</code> (Streamable HTTP + PKCE S256)</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag <code>ai_content_studio_enabled</code>)</td></tr>
@@ -451,7 +451,8 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.7 / 27 Nov. 2026</td><td>Reemplaza el menú desplegable nativo en <em>Estadísticas &amp; Ads</em> por un <strong>Selector Moderno de Marca y Cuentas Estilo Metricool</strong> con avatar de marca, íconos vectoriales (Meta Ads, Facebook, Instagram, YouTube), listado de páginas conectadas y píldora superior multi-red diferenciada.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.8 / 27 Nov. 2026</td><td>Extiende el <strong>Selector Moderno de Marca y Páginas Estilo Metricool</strong> a toda la barra superior de <strong>Calendario y Lista</strong> (agrupando las 5 marcas con avatar, íconos y filtros por página en 1 clic) y reemplaza los menús nativos en <em>Filtros</em> por píldoras e íconos modernos.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.7 / 27 Nov. 2026</td><td>Reemplaza el menú desplegable nativo en <em>Estadísticas &amp; Ads</em> por un <strong>Selector Moderno de Marca y Cuentas Estilo Metricool</strong> con avatar de marca, íconos vectoriales (Meta Ads, Facebook, Instagram, YouTube), listado de páginas conectadas y píldora superior multi-red diferenciada.</td><td>Superada por v1.8</td></tr>
         <tr><td>1.6 / 27 Nov. 2026</td><td>Rediseño limpio estilo Metricool en 3 sub-vistas (<em>Resumen &amp; ROI</em>, <em>Campañas Meta</em>, <em>Ventas &amp; Cohorte</em>), atribución exacta <code>Redes Sociales</code> vs <code>Meta Ads</code> vs <code>Otros</code> y detalle de fecha de ingreso CRM, fecha de cierre, cohorte y días en cerrar.</td><td>Superada por v1.7</td></tr>
         <tr><td>1.5 / 27 Nov. 2026</td><td>Agrega <strong>Panel de Retorno de Inversión (ROI)</strong> en <strong>Estadísticas &amp; Ads</strong> (Inversión Ads + IA vs Ventas Ganadas <code>Cerrado</code>/<code>Cliente</code> por fecha de cierre real) y gráfica diaria <em>Inversión vs Ganado (\$USD)</em>.</td><td>Superada por v1.6</td></tr>
         <tr><td>1.4 / 27 Nov. 2026</td><td>Agrega pestaña <strong>Estadísticas &amp; Ads</strong> (inversión Meta Ads, impresiones, clics, formularios llenados, CPL y cruce CRM/IA) y filtro <strong>Este Mes (MTD)</strong> en <code>/reports</code>.</td><td>Superada por v1.5</td></tr>
@@ -472,16 +473,15 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
     <h1 class="sec-h1" style="font-size:19px;">Calendario por Horas y Vista Lista Comercial</h1>
     <p class="lead-p" style="margin-bottom:6px;">Control visual de programación semanal con mejores horarios y gestión rápida en tabla con acciones en lote.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">01 ·</span> Operar la grilla horaria y activar Mejores horarios</div>
-    <p class="body-p" style="margin-bottom:4px;">En <strong>Calendario</strong>, alterne entre <strong>Horas</strong> y <strong>Tarjetas</strong>, active <strong>Mejores horarios</strong> para visualizar franjas recomendadas o pulse en cualquier celda / <strong>+ Crear Post</strong>.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">01 ·</span> Cambiar de marca o página en Calendario y operar la grilla horaria</div>
+    <p class="body-p" style="margin-bottom:4px;">En <strong>Calendario</strong>, use el selector superior estilo Metricool para filtrar por marca o página conectada, alterne <strong>Horas / Tarjetas</strong> y pulse cualquier celda o <strong>+ Crear Post</strong>.</p>
     <div class="shot-frame compact">
-      <img src="${pHourly}" alt="Calendario por Horas en Planning" />
-      <div class="callout-box" style="left:28.8%;top:7.4%;width:29.0%;height:5.2%;"><span class="callout-tag">1. Navegación limpia</span></div>
-      <div class="callout-box" style="left:42.5%;top:19.4%;width:21.1%;height:4.1%;"><span class="callout-tag bottom">2. Horas / Tarjetas y Mejores horarios</span></div>
-      <div class="callout-box" style="left:72.9%;top:19.4%;width:7.6%;height:4.1%;"><span class="callout-tag right">3. + Crear Post</span></div>
-      <div class="callout-box" style="left:36.2%;top:83.4%;width:9.2%;height:7.4%;"><span class="callout-tag">4. Flyer ChatGPT publicado</span></div>
+      <img src="${pHourly}" alt="Calendario por Horas con Selector Moderno de Marca y Páginas en Planning" />
+      <div class="callout-box" style="left:24.0%;top:18.5%;width:24.8%;height:64.5%;"><span class="callout-tag bottom">1. Selector Marca + 9 Páginas (Calendario)</span></div>
+      <div class="callout-box" style="left:48.8%;top:25.2%;width:31.8%;height:4.2%;"><span class="callout-tag right">2. Horas / Tarjetas, Mejores horarios y Crear Post</span></div>
+      <div class="callout-box" style="left:74.8%;top:47.0%;width:9.8%;height:8.6%;"><span class="callout-tag bottom right">3. Posts semanales</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 1. Vista real del Calendario por Horas en zona El Salvador (-06:00) con Episodio 21 publicado desde ChatGPT Plus.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 1. Vista real del Calendario con selector moderno de marca (5 marcas agrupadas con avatar/íconos y 9 páginas conectadas).</div>
 
     <div class="step-hdr" style="margin-top:2px;"><span class="num">02 ·</span> Supervisar estado por red y ejecutar acciones en Lista</div>
     <p class="body-p" style="margin-bottom:4px;">En <strong>Lista</strong>, filtre por estado (<em>Programados</em>, <em>Publicados</em>, <em>Borradores</em>), marque casillas para <strong>Acciones en lote</strong> o use el menú <code>⋯</code> por publicación.</p>
