@@ -139,9 +139,9 @@ export default function MobileNav() {
             >
                 <nav
                     style={{
-                        WebkitBackdropFilter: 'blur(2px) saturate(140%)',
-                        backdropFilter: 'blur(2px) saturate(140%)',
-                        background: 'linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.05) 55%, rgba(255,255,255,0.14) 100%)',
+                        WebkitBackdropFilter: 'blur(6px) saturate(155%)',
+                        backdropFilter: 'blur(6px) saturate(155%)',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.54) 0%, rgba(255,255,255,0.36) 55%, rgba(255,255,255,0.46) 100%)',
                     }}
                     className="pointer-events-auto mx-auto max-w-md h-[64px] px-2 rounded-full border border-white/80 ring-1 ring-slate-900/[0.07] shadow-[0_8px_26px_rgba(15,23,42,0.12),inset_0_1.5px_1px_rgba(255,255,255,0.92),inset_0_-1px_2px_rgba(15,23,42,0.06)] flex items-center justify-around"
                 >

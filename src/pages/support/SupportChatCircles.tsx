@@ -3615,7 +3615,7 @@ export const SupportChatCircles: React.FC = () => {
         } ${
           mobileListScrolled
             ? 'h-[56px] bg-gradient-to-b from-white/25 via-white/[0.04] to-transparent border-b border-transparent shadow-none pointer-events-none'
-            : 'h-[60px] bg-white/[0.08] backdrop-blur-[2px] backdrop-saturate-[140%] border-b border-white/60 shadow-[0_4px_16px_rgba(15,23,42,0.04)]'
+            : 'h-[60px] bg-white/45 backdrop-blur-[6px] backdrop-saturate-[155%] border-b border-white/60 shadow-[0_4px_16px_rgba(15,23,42,0.04)]'
         }`}
       >
         <div
@@ -3672,8 +3672,8 @@ export const SupportChatCircles: React.FC = () => {
               title="Centro de Alertas y Seguimiento"
               className={`relative inline-flex items-center gap-1.5 px-3.5 py-2 md:px-3 md:py-1.5 text-[14.5px] md:text-[13px] font-semibold transition-all duration-200 lg:rounded-lg lg:bg-slate-50 lg:hover:bg-slate-100 lg:border lg:border-slate-200/80 lg:shadow-none lg:ring-0 lg:backdrop-blur-none ${
                 mobileListScrolled
-                  ? 'rounded-full bg-white/[0.08] backdrop-blur-[2px] backdrop-saturate-[140%] border border-white/80 ring-1 ring-slate-900/[0.08] shadow-[0_8px_22px_rgba(15,23,42,0.12),inset_0_1.5px_1px_rgba(255,255,255,0.92)] text-slate-950'
-                  : 'rounded-full bg-white/[0.10] backdrop-blur-[2px] backdrop-saturate-[140%] text-slate-900 border border-white/80 ring-1 ring-slate-900/[0.07] shadow-2xs hover:bg-white/25'
+                  ? 'rounded-full bg-white/45 backdrop-blur-[6px] backdrop-saturate-[155%] border border-white/80 ring-1 ring-slate-900/[0.08] shadow-[0_8px_22px_rgba(15,23,42,0.12),inset_0_1.5px_1px_rgba(255,255,255,0.92)] text-slate-950'
+                  : 'rounded-full bg-white/48 backdrop-blur-[6px] backdrop-saturate-[155%] text-slate-900 border border-white/80 ring-1 ring-slate-900/[0.07] shadow-2xs hover:bg-white/65'
               }`}
             >
               {alertCircles.total > 0 || bellRinging ? (
