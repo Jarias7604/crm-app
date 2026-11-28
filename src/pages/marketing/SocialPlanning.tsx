@@ -51,6 +51,7 @@ import {
 } from '../../components/social/SocialBrandKit';
 import { PostLivePreview } from '../../components/social/PostLivePreview';
 import { PlanningAnalyticsTab } from '../../components/social/PlanningAnalyticsTab';
+import { pickDistinctPlatformAccounts } from '../../lib/socialBrandMatcher';
 
 type PlanningTab = 'calendar' | 'list' | 'deleted' | 'analytics' | 'connections';
 type CalendarMode = 'hourly' | 'cards';
@@ -914,23 +915,23 @@ export default function SocialPlanning() {
                                 type="button"
                                 onClick={() => setShowConnectionsModal(true)}
                                 className="inline-flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full border border-slate-200 bg-slate-50 hover:bg-slate-100 transition cursor-pointer"
-                                title="Gestionar conexiones de redes"
+                                title={
+                                    accounts.length > 0
+                                        ? `Cuentas conectadas: ${accounts.map((a) => `${a.platform} (${a.display_name || a.account_name || a.id})`).join(', ')}`
+                                        : 'Gestionar conexiones de redes'
+                                }
                             >
                                 <div className="flex -space-x-1.5">
-                                    {publishableAccounts.slice(0, 3).map((acc) => (
+                                    {pickDistinctPlatformAccounts(accounts, 4).map((acc) => (
                                         <span
                                             key={acc.id}
-                                            className="w-5 h-5 rounded-full ring-2 ring-white bg-white overflow-hidden flex items-center justify-center text-[9px] font-bold text-slate-700"
+                                            className="inline-flex shrink-0"
                                         >
-                                            {acc.avatar_url ? (
-                                                <img
-                                                    src={acc.avatar_url}
-                                                    alt=""
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <SocialNetworkBadge platform={acc.platform} size="xs" />
-                                            )}
+                                            <SocialNetworkBadge
+                                                platform={acc.platform}
+                                                size="xs"
+                                                title={`${acc.platform}: ${acc.display_name || acc.account_name || ''}`}
+                                            />
                                         </span>
                                     ))}
                                 </div>
@@ -1819,6 +1820,7 @@ export default function SocialPlanning() {
                     <PlanningAnalyticsTab
                         companyId={companyId}
                         metaAdsAccounts={metaAdsAccounts}
+                        allSocialAccounts={accounts}
                         onOpenConnect={() => setActiveTab('connections')}
                     />
                 )}

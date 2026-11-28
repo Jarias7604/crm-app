@@ -4,6 +4,9 @@ import {
     AlertCircle,
     ArrowUpRight,
     Calendar,
+    Check,
+    ChevronDown,
+    ChevronRight,
     ExternalLink,
     Loader2,
     Plus,
@@ -29,11 +32,13 @@ import {
     type MetaAdsWonDealItem,
 } from '../../services/social/metaAdsService';
 import type { SocialAccount } from '../../services/social/socialPublishService';
-import { MetaAdsIcon } from './SocialBrandKit';
+import { matchBrandSocialAccounts } from '../../lib/socialBrandMatcher';
+import { MetaAdsIcon, renderPlatformIcon } from './SocialBrandKit';
 
 interface PlanningAnalyticsTabProps {
     companyId: string;
     metaAdsAccounts: SocialAccount[];
+    allSocialAccounts?: SocialAccount[];
     onOpenConnect: () => void;
 }
 
@@ -116,6 +121,7 @@ function OriginBadge({ item }: { item: MetaAdsWonDealItem }) {
 export function PlanningAnalyticsTab({
     companyId,
     metaAdsAccounts,
+    allSocialAccounts,
     onOpenConnect,
 }: PlanningAnalyticsTabProps) {
     const navigate = useNavigate();
@@ -126,11 +132,21 @@ export function PlanningAnalyticsTab({
     const [since, setSince] = useState(initialRange.since);
     const [until, setUntil] = useState(initialRange.until);
     const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+    const [accountMenuOpen, setAccountMenuOpen] = useState(false);
     const [sourceScope, setSourceScope] = useState<SourceScope>('all');
     const [cohortScope, setCohortScope] = useState<CohortScope>('all');
     const [chartMode, setChartMode] = useState<'roi' | 'leads'>('roi');
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<MetaAdsInsightsResponse | null>(null);
+
+    useEffect(() => {
+        if (!accountMenuOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setAccountMenuOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [accountMenuOpen]);
 
     const handleSelectPreset = (next: MetaAdsDatePreset) => {
         setPreset(next);
@@ -197,6 +213,38 @@ export function PlanningAnalyticsTab({
     const campaigns = data?.campaigns || [];
     const connected = Boolean(data?.connected || metaAdsAccounts.length > 0);
     const allWonItems = crm.won_items || [];
+
+    const publishableAccounts = useMemo(
+        () => (allSocialAccounts || []).filter((a) => a.platform !== 'meta_ads'),
+        [allSocialAccounts],
+    );
+
+    const adAccountOptions = useMemo(() => {
+        if (data?.ad_accounts?.length) return data.ad_accounts;
+        return metaAdsAccounts.map((a) => ({
+            id: a.id,
+            account_id: a.account_id || a.id,
+            account_name: a.display_name || a.account_name || 'Cuenta Meta Ads',
+            is_default: a.is_default,
+            currency: String(a.metadata?.currency || 'USD'),
+            connection_mode: String(a.metadata?.connection_mode || 'oauth'),
+        }));
+    }, [data?.ad_accounts, metaAdsAccounts]);
+
+    const activeAdAccount = useMemo(
+        () =>
+            adAccountOptions.find((a) => a.account_id === selectedAccountId) ||
+            data?.active_account ||
+            adAccountOptions[0] ||
+            null,
+        [adAccountOptions, selectedAccountId, data?.active_account],
+    );
+
+    const activeBrandName = activeAdAccount?.account_name || (connected ? 'Arias Group' : 'Conectar Meta Ads');
+    const activeBrandMatch = useMemo(
+        () => matchBrandSocialAccounts(activeBrandName, publishableAccounts),
+        [activeBrandName, publishableAccounts],
+    );
 
     const cohortSummary = useMemo(() => {
         if (crm.cohort_summary) return crm.cohort_summary;
@@ -421,38 +469,230 @@ export function PlanningAnalyticsTab({
                         />
                     </div>
 
-                    {(data?.ad_accounts?.length || 0) > 1 && (
-                        <select
-                            value={selectedAccountId}
-                            onChange={(e) => setSelectedAccountId(e.target.value)}
-                            className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-[11px] font-medium text-slate-700"
-                        >
-                            {data!.ad_accounts.map((acc) => (
-                                <option key={acc.account_id} value={acc.account_id}>
-                                    {acc.account_name}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-
                     <button
                         type="button"
                         onClick={loadInsights}
                         disabled={loading}
                         title="Actualizar datos"
-                        className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 cursor-pointer"
+                        className="p-2 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-600 shadow-2xs cursor-pointer transition"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={onOpenConnect}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0081FB]/10 hover:bg-[#0081FB]/15 text-[#0081FB] text-[11px] font-semibold cursor-pointer transition"
-                    >
-                        <MetaAdsIcon className="w-3.5 h-3.5 rounded-full" />
-                        {connected ? (data?.active_account?.account_name || 'Arias Group') : 'Conectar Meta Ads'}
-                    </button>
+                    {/* METRICOOL-STYLE BRAND & ACCOUNT SWITCHER DROPDOWN */}
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => setAccountMenuOpen((v) => !v)}
+                            className={`inline-flex items-center gap-2.5 pl-1.5 pr-2.5 py-1 rounded-xl border bg-white shadow-2xs transition cursor-pointer ${
+                                accountMenuOpen
+                                    ? 'border-slate-400 ring-2 ring-slate-900/5'
+                                    : 'border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/70'
+                            }`}
+                            aria-expanded={accountMenuOpen}
+                            title="Cambiar cuenta Meta Ads y ver páginas conectadas"
+                        >
+                            {activeBrandMatch.avatarUrl ? (
+                                <img
+                                    src={activeBrandMatch.avatarUrl}
+                                    alt={activeBrandName}
+                                    className="w-7 h-7 rounded-lg object-cover border border-slate-200/80 shrink-0"
+                                />
+                            ) : (
+                                <div className="w-7 h-7 rounded-lg bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                                    {activeBrandName
+                                        .split(/\s+/)
+                                        .filter(Boolean)
+                                        .slice(0, 2)
+                                        .map((w) => w[0]?.toUpperCase() || '')
+                                        .join('') || 'AG'}
+                                </div>
+                            )}
+
+                            <div className="text-left min-w-0">
+                                <div className="text-[12px] font-bold text-slate-900 leading-tight max-w-[165px] truncate">
+                                    {activeBrandName}
+                                </div>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                    {connected && <MetaAdsIcon className="w-3.5 h-3.5 shrink-0" />}
+                                    {activeBrandMatch.platforms.slice(0, 3).map((platform) => (
+                                        <span key={platform} className="inline-flex shrink-0">
+                                            {renderPlatformIcon(platform, 'w-3.5 h-3.5')}
+                                        </span>
+                                    ))}
+                                    <span className="text-[10px] font-medium text-slate-400 ml-0.5">
+                                        {connected ? activeAdAccount?.currency || 'USD' : 'Sin conectar'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <ChevronDown
+                                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                                    accountMenuOpen ? 'rotate-180 text-slate-700' : ''
+                                }`}
+                            />
+                        </button>
+
+                        {accountMenuOpen && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-30"
+                                    onClick={() => setAccountMenuOpen(false)}
+                                />
+                                <div className="absolute right-0 top-full mt-2 w-[350px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl border border-slate-200/90 shadow-[0_20px_50px_rgba(15,23,42,0.16)] overflow-hidden z-40 animate-in fade-in slide-in-from-top-2">
+                                    {/* Top Action Card — Metricool "Add brand" pattern */}
+                                    <div className="p-2.5 border-b border-slate-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAccountMenuOpen(false);
+                                                onOpenConnect();
+                                            }}
+                                            className="w-full flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-sky-50/70 hover:border-sky-200 transition text-left cursor-pointer group"
+                                        >
+                                            <div className="w-9 h-9 rounded-full bg-sky-50 border border-sky-200/80 text-[#0081FB] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                                <Plus className="w-4 h-4" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-[12.5px] font-bold text-slate-900">
+                                                    Administrar o conectar cuentas
+                                                </div>
+                                                <div className="text-[11px] text-slate-500">
+                                                    {adAccountOptions.length} cuenta(s) Ads · {publishableAccounts.length} red(es) conectadas
+                                                </div>
+                                            </div>
+                                            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#0081FB] shrink-0" />
+                                        </button>
+                                    </div>
+
+                                    {/* Meta Ads Brand Rows */}
+                                    <div className="px-3.5 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        Cuentas Meta Ads (Estadísticas)
+                                    </div>
+                                    <div className="max-h-[260px] overflow-y-auto divide-y divide-slate-100">
+                                        {adAccountOptions.length === 0 ? (
+                                            <div className="px-4 py-5 text-center text-xs text-slate-500">
+                                                No hay cuentas Meta Ads conectadas todavía.
+                                            </div>
+                                        ) : (
+                                            adAccountOptions.map((acc) => {
+                                                const isActive = activeAdAccount?.account_id === acc.account_id;
+                                                const match = matchBrandSocialAccounts(acc.account_name, publishableAccounts);
+                                                const initialsText =
+                                                    acc.account_name
+                                                        .split(/\s+/)
+                                                        .filter(Boolean)
+                                                        .slice(0, 2)
+                                                        .map((w) => w[0]?.toUpperCase() || '')
+                                                        .join('') || 'MA';
+                                                return (
+                                                    <button
+                                                        key={acc.account_id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedAccountId(acc.account_id);
+                                                            setAccountMenuOpen(false);
+                                                        }}
+                                                        className={`w-full px-3.5 py-2.5 flex items-center gap-3 text-left transition cursor-pointer border-l-[3px] ${
+                                                            isActive
+                                                                ? 'border-l-slate-900 bg-slate-50/90'
+                                                                : 'border-l-transparent hover:bg-slate-50/60'
+                                                        }`}
+                                                    >
+                                                        {match.avatarUrl ? (
+                                                            <img
+                                                                src={match.avatarUrl}
+                                                                alt={acc.account_name}
+                                                                className="w-10 h-10 rounded-xl object-cover border border-slate-200 shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                                                                {initialsText}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span className="text-[13px] font-bold text-slate-900 truncate">
+                                                                    {acc.account_name}
+                                                                </span>
+                                                                {acc.is_default && (
+                                                                    <span className="px-1.5 py-0.2 rounded-md bg-sky-50 text-[#0081FB] border border-sky-200/70 text-[9.5px] font-bold shrink-0">
+                                                                        Principal
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Platform icons connected to this brand */}
+                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                                <span title={`Meta Ads · ${acc.account_id}`} className="inline-flex">
+                                                                    <MetaAdsIcon className="w-4 h-4 shrink-0" />
+                                                                </span>
+                                                                {match.matched.map((soc) => (
+                                                                    <span
+                                                                        key={soc.id}
+                                                                        title={`${soc.platform} · ${soc.display_name || soc.account_name || ''}`}
+                                                                        className="inline-flex"
+                                                                    >
+                                                                        {renderPlatformIcon(soc.platform, 'w-4 h-4 shrink-0')}
+                                                                    </span>
+                                                                ))}
+                                                                <span className="text-[10.5px] text-slate-400 truncate ml-0.5">
+                                                                    {match.matched.length > 0
+                                                                        ? `${match.matched.length} página(s) · ${acc.currency || 'USD'}`
+                                                                        : `${acc.account_id} · ${acc.currency || 'USD'}`}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {isActive && <Check className="w-4 h-4 text-slate-900 shrink-0" />}
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+
+                                    {/* Connected Pages & Networks Footer */}
+                                    {publishableAccounts.length > 0 && (
+                                        <div className="px-3.5 py-2.5 bg-slate-50/80 border-t border-slate-100 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                    Páginas y redes conectadas ({publishableAccounts.length})
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setAccountMenuOpen(false);
+                                                        onOpenConnect();
+                                                    }}
+                                                    className="text-[11px] font-semibold text-[#0081FB] hover:underline cursor-pointer"
+                                                >
+                                                    Ver todas →
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5 max-h-[84px] overflow-y-auto">
+                                                {publishableAccounts.map((acc) => {
+                                                    const name = acc.display_name || acc.account_name || acc.platform;
+                                                    return (
+                                                        <span
+                                                            key={acc.id}
+                                                            title={`${acc.platform}: ${name}`}
+                                                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white border border-slate-200/80 text-[11px] font-medium text-slate-700 max-w-[156px]"
+                                                        >
+                                                            <span className="inline-flex shrink-0">
+                                                                {renderPlatformIcon(acc.platform, 'w-3.5 h-3.5')}
+                                                            </span>
+                                                            <span className="truncate">{name}</span>
+                                                        </span>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 

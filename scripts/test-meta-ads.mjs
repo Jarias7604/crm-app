@@ -12,16 +12,28 @@ const esbuild = require('esbuild');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'crm-meta-ads-tests-'));
 
 let mod;
+let matcherMod;
 test.before(async () => {
   const outFile = path.join(tmpDir, 'helpers.mjs');
-  await esbuild.build({
-    entryPoints: [path.resolve('supabase/functions/meta-ads-insights/helpers.ts')],
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    outfile: outFile,
-  });
+  const matcherOutFile = path.join(tmpDir, 'matcher.mjs');
+  await Promise.all([
+    esbuild.build({
+      entryPoints: [path.resolve('supabase/functions/meta-ads-insights/helpers.ts')],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: outFile,
+    }),
+    esbuild.build({
+      entryPoints: [path.resolve('src/lib/socialBrandMatcher.ts')],
+      bundle: true,
+      platform: 'node',
+      format: 'esm',
+      outfile: matcherOutFile,
+    }),
+  ]);
   mod = await import(pathToFileURL(outFile).href);
+  matcherMod = await import(pathToFileURL(matcherOutFile).href);
 });
 
 test.after(() => {
@@ -210,4 +222,33 @@ test('7. classifyLeadOrigin and classifyWonCohort attribute Redes Sociales, Meta
 
   const prevMonth = mod.classifyWonCohort('2026-10-18', '2026-11-06', '2026-11-01');
   assert.deepEqual(prevMonth, { cohort: 'previous_period', days_to_close: 19 });
+});
+
+test('8. matchBrandSocialAccounts & pickDistinctPlatformAccounts match brands to pages and deduplicate platforms', () => {
+  const accounts = [
+    { id: '1', platform: 'facebook', account_name: 'Jimmy Arias AI + Lean', avatar_url: 'https://cdn.example/jimmy.jpg', is_default: true },
+    { id: '2', platform: 'facebook', account_name: 'Arias Defense', avatar_url: 'https://cdn.example/defense.jpg', is_default: false },
+    { id: '3', platform: 'facebook', account_name: 'Arias Group', avatar_url: 'https://cdn.example/group.jpg', is_default: false },
+    { id: '4', platform: 'instagram', account_name: 'Arias Defense', avatar_url: 'https://cdn.example/defense-ig.jpg', is_default: false },
+    { id: '5', platform: 'youtube', account_name: 'Jimmy Arias AI + Lean', avatar_url: 'https://cdn.example/yt.jpg', is_default: false },
+    { id: '6', platform: 'meta_ads', account_name: 'Arias Group', avatar_url: null, is_default: true },
+  ];
+
+  const jimmyMatch = matcherMod.matchBrandSocialAccounts('Jimmy Arias', accounts);
+  assert.deepEqual(jimmyMatch.platforms, ['facebook', 'youtube']);
+  assert.equal(jimmyMatch.avatarUrl, 'https://cdn.example/jimmy.jpg');
+
+  const defenseMatch = matcherMod.matchBrandSocialAccounts('Arias Defense Components', accounts);
+  assert.deepEqual(defenseMatch.platforms, ['facebook', 'instagram']);
+  assert.equal(defenseMatch.matched.some((a) => a.account_name === 'Jimmy Arias AI + Lean'), false);
+
+  const groupMatch = matcherMod.matchBrandSocialAccounts('Arias Group', accounts);
+  assert.deepEqual(groupMatch.platforms, ['facebook']);
+  assert.equal(groupMatch.matched.length, 1);
+
+  const distinct = matcherMod.pickDistinctPlatformAccounts(accounts, 4);
+  assert.deepEqual(
+    distinct.map((a) => a.platform),
+    ['facebook', 'instagram', 'youtube', 'meta_ads'],
+  );
 });
