@@ -177,7 +177,7 @@ const hdr = (code = 'SOP-COM-2026-04 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Marketing y Redes Sociales / Versión 1.6 · Planning + Meta Ads + ROI Estilo Metricool + Cohorte &amp; Orígenes CRM + MCP</span>
+    <span>Marketing y Redes Sociales / Versión 1.7 · Planning + Selector Marca Metricool + Meta Ads ROI + Cohorte &amp; MCP</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -195,7 +195,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
       <div class="kicker" style="margin-top:24px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.6 · Rediseño Analítica Estilo Metricool + Atribución Meta/Redes Sociales + Cohorte Ingreso vs Cierre CRM</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.7 · Selector Moderno de Marca/Cuenta Estilo Metricool + Íconos Oficiales y Páginas Conectadas + ROI</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">27 de noviembre de 2026</td></tr>
         <tr><td class="kv-key">URL Servidor MCP</td><td class="kv-val"><code>https://www.ariascrm.com/mcp</code> (Streamable HTTP + PKCE S256)</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag <code>ai_content_studio_enabled</code>)</td></tr>
@@ -451,7 +451,8 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.6 / 27 Nov. 2026</td><td>Rediseño limpio estilo Metricool en 3 sub-vistas (<em>Resumen &amp; ROI</em>, <em>Campañas Meta</em>, <em>Ventas &amp; Cohorte</em>), atribución exacta <code>Redes Sociales</code> vs <code>Meta Ads</code> vs <code>Otros</code> y detalle de fecha de ingreso CRM, fecha de cierre, cohorte y días en cerrar.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.7 / 27 Nov. 2026</td><td>Reemplaza el menú desplegable nativo en <em>Estadísticas &amp; Ads</em> por un <strong>Selector Moderno de Marca y Cuentas Estilo Metricool</strong> con avatar de marca, íconos vectoriales (Meta Ads, Facebook, Instagram, YouTube), listado de páginas conectadas y píldora superior multi-red diferenciada.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.6 / 27 Nov. 2026</td><td>Rediseño limpio estilo Metricool en 3 sub-vistas (<em>Resumen &amp; ROI</em>, <em>Campañas Meta</em>, <em>Ventas &amp; Cohorte</em>), atribución exacta <code>Redes Sociales</code> vs <code>Meta Ads</code> vs <code>Otros</code> y detalle de fecha de ingreso CRM, fecha de cierre, cohorte y días en cerrar.</td><td>Superada por v1.7</td></tr>
         <tr><td>1.5 / 27 Nov. 2026</td><td>Agrega <strong>Panel de Retorno de Inversión (ROI)</strong> en <strong>Estadísticas &amp; Ads</strong> (Inversión Ads + IA vs Ventas Ganadas <code>Cerrado</code>/<code>Cliente</code> por fecha de cierre real) y gráfica diaria <em>Inversión vs Ganado (\$USD)</em>.</td><td>Superada por v1.6</td></tr>
         <tr><td>1.4 / 27 Nov. 2026</td><td>Agrega pestaña <strong>Estadísticas &amp; Ads</strong> (inversión Meta Ads, impresiones, clics, formularios llenados, CPL y cruce CRM/IA) y filtro <strong>Este Mes (MTD)</strong> en <code>/reports</code>.</td><td>Superada por v1.5</td></tr>
       </tbody>
@@ -643,15 +644,15 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning, Meta Ads ROI Es
     <h1 class="sec-h1" style="font-size:18.5px;">Analítica Estilo Metricool: Resumen ROI y Cohorte de Ventas CRM</h1>
     <p class="lead-p" style="margin-bottom:5px;">Evaluación ordenada por rango de fechas, origen exacto (<em>Meta Ads</em>, <em>Redes Sociales</em>, <em>Otros</em>) y maduración del prospecto.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Leer Resumen &amp; ROI con los 4 indicadores pastel y filtros de origen/cohorte</div>
-    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads → Resumen &amp; ROI</strong>, combine <strong>Origen</strong> y <strong>Cohorte</strong> para evaluar utilidad neta, ROI %, ROAS y evolución diaria al estilo Metricool.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">11 ·</span> Seleccionar cuenta publicitaria estilo Metricool, ver páginas y leer ROI</div>
+    <p class="body-p" style="margin-bottom:3px;">En <strong>Planning → Estadísticas &amp; Ads</strong>, abra el selector moderno de marca para cambiar entre cuentas Meta Ads viendo íconos y páginas conectadas, y combine <strong>Origen</strong> y <strong>Cohorte</strong> para evaluar ROI.</p>
     <div class="shot-frame compact" style="width:76%;">
-      <img src="${pAnalytics}" alt="Vista Resumen y ROI estilo Metricool en Social Planning" />
-      <div class="callout-box" style="left:20.5%;top:19.6%;width:76.2%;height:10.4%;"><span class="callout-tag">1. Sub-vistas (Resumen, Campañas, Ventas) y Fechas</span></div>
-      <div class="callout-box" style="left:20.5%;top:37.8%;width:76.2%;height:13.8%;"><span class="callout-tag bottom">2. 4 Indicadores Pastel (Inversión, Ganado, ROI, Formularios)</span></div>
-      <div class="callout-box" style="left:20.5%;top:56.0%;width:76.2%;height:39.4%;"><span class="callout-tag" style="top:auto;bottom:6px;right:8px;left:auto;">3. Gráfica diaria Inversión vs Ganado</span></div>
+      <img src="${pAnalytics}" alt="Selector moderno de Marca y Cuentas estilo Metricool en Social Planning" />
+      <div class="callout-box" style="left:49.3%;top:30.6%;width:24.8%;height:52.4%;"><span class="callout-tag bottom">1. Selector Marca Metricool + Páginas</span></div>
+      <div class="callout-box" style="left:20.5%;top:40.2%;width:17.8%;height:12.2%;"><span class="callout-tag bottom">2. Inversión Total (Ads + IA)</span></div>
+      <div class="callout-box" style="left:77.5%;top:40.2%;width:17.6%;height:12.2%;"><span class="callout-tag bottom right">3. Formularios &amp; CPL</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Vista principal estilo Metricool con sub-pestañas ordenadas, 4 indicadores pastel y gráfica limpia de evolución diaria.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 11. Selector moderno de marca estilo Metricool con avatar, íconos por red (Meta Ads, FB, IG, YT), las 9 páginas conectadas y métricas ROI.</div>
 
     <div class="step-hdr" style="margin-top:2px;"><span class="num">12 ·</span> Auditar fecha de ingreso CRM, fecha de cierre, días y origen en Ventas &amp; Cohorte</div>
     <p class="body-p" style="margin-bottom:3px;">En la sub-pestaña <strong>Ventas &amp; Cohorte</strong>, verifique qué cierres ingresaron en el mismo mes frente a meses anteriores, su origen real y ábralos directo en el CRM.</p>
