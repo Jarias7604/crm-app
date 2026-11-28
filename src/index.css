@@ -92,6 +92,24 @@ body {
         from { opacity: 0; transform: translateY(-8px) scale(0.98); }
         to   { opacity: 1; transform: translateY(0) scale(1); }
     }
+
+    .animate-ios-sheet-up {
+        animation: iosSheetUp 0.28s cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+
+    @keyframes iosSheetUp {
+        from { opacity: 0.92; transform: translateY(100%); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-ios-backdrop {
+        animation: iosBackdropIn 0.22s ease-out both;
+    }
+
+    @keyframes iosBackdropIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
 }
 
 @layer base {

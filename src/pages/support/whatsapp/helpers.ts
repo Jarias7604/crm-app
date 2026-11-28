@@ -8,6 +8,7 @@ import type {
   CircleBucket,
   CircleStateFilter,
   CircleTeamStatus,
+  ChatTimeRangeFilter,
   QuickReplyTemplate,
   SpecialTray,
   SupportChannelType,
@@ -810,6 +811,33 @@ export function getFreshLeadLabel(
   if (effectiveYmd === todayYmd) return 'Nuevo · Hoy';
   if (effectiveYmd === yesterdayYmd) return 'Nuevo · Ayer';
   return null;
+}
+
+export const CHAT_TIME_RANGE_LABELS: Record<ChatTimeRangeFilter, string> = {
+  all: 'Todo',
+  today: 'Hoy',
+  week: 'Semana',
+  month: 'Mes',
+};
+
+export function matchesChatTimeRange(
+  iso?: string | null,
+  range: ChatTimeRangeFilter = 'all',
+  nowMs = Date.now(),
+): boolean {
+  if (range === 'all') return true;
+  if (!iso) return false;
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return false;
+
+  const msgYmd = SV_YMD_FORMATTER.format(new Date(ts));
+  const todayYmd = SV_YMD_FORMATTER.format(new Date(nowMs));
+  if (range === 'today') return msgYmd === todayYmd;
+  if (range === 'week') {
+    const weekStartYmd = SV_YMD_FORMATTER.format(new Date(nowMs - 6 * 86_400_000));
+    return msgYmd >= weekStartYmd && msgYmd <= todayYmd;
+  }
+  return msgYmd.slice(0, 7) === todayYmd.slice(0, 7);
 }
 
 export function parseQuotedReplyPrefix(rawText: string): { quote: { author: string; text: string } | null; body: string } {

@@ -129,6 +129,7 @@ import type {
   CircleBucket,
   SpecialTray,
   CircleStateFilter,
+  ChatTimeRangeFilter,
 } from './whatsapp/types';
 import {
   TZ,
@@ -169,6 +170,8 @@ import {
   isRetryableOutboxError,
   classifyLeadStageGroup,
   getFreshLeadLabel,
+  CHAT_TIME_RANGE_LABELS,
+  matchesChatTimeRange,
   type QuotedReplyRef,
 } from './whatsapp/helpers';
 import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
@@ -407,6 +410,7 @@ export const SupportChatCircles: React.FC = () => {
   const [stateFilters, setStateFilters] = useState<CircleStateFilter[]>([]);
   const [specialTray, setSpecialTray] = useState<SpecialTray | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<OwnerSubFilter>('all');
+  const [timeRangeFilter, setTimeRangeFilter] = useState<ChatTimeRangeFilter>('all');
   const [channelFilter, setChannelFilter] = useState<'all' | SupportChannelType>('all');
   const [leadSubFilter, setLeadSubFilter] = useState<LeadStageSubFilter>('activos');
 
@@ -1439,8 +1443,20 @@ export const SupportChatCircles: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [circles, readCirclesMap, forcedUnreadMap, profile?.id]);
 
+  const periodCounts = useMemo(() => {
+    const trayBase = circles.filter((c) => matchesCircleBucketAndTray(c, selectedBuckets, specialTray));
+    return {
+      all: trayBase.length,
+      today: trayBase.filter((c) => matchesChatTimeRange(c.lastMessageAt, 'today')).length,
+      week: trayBase.filter((c) => matchesChatTimeRange(c.lastMessageAt, 'week')).length,
+      month: trayBase.filter((c) => matchesChatTimeRange(c.lastMessageAt, 'month')).length,
+    };
+  }, [circles, selectedBuckets, specialTray]);
+
   const contextCounts = useMemo(() => {
-    const base = circles.filter((c) => matchesCircleBucketAndTray(c, selectedBuckets, specialTray));
+    const base = circles.filter(
+      (c) => matchesCircleBucketAndTray(c, selectedBuckets, specialTray) && matchesChatTimeRange(c.lastMessageAt, timeRangeFilter),
+    );
     const waitingList = base.filter((c) => c.unreadOrWaitingReply);
     return {
       total: base.length,
@@ -1454,7 +1470,7 @@ export const SupportChatCircles: React.FC = () => {
       urgent: waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, selectedBuckets, specialTray, readCirclesMap, forcedUnreadMap, profile?.id]);
+  }, [circles, selectedBuckets, specialTray, timeRangeFilter, readCirclesMap, forcedUnreadMap, profile?.id]);
 
   // Real-time sound + desktop notification + bell shake when new incoming message arrives
   useEffect(() => {
@@ -1590,6 +1606,7 @@ export const SupportChatCircles: React.FC = () => {
   const leadSubCounts = useMemo(() => {
     const base = circles.filter((c) => {
       if (!c.isWhatsApp) return false;
+      if (!matchesChatTimeRange(c.lastMessageAt, timeRangeFilter)) return false;
       if (singleBucket === 'reactivados') return c.isReactivation;
       if (singleBucket === 'lead') return c.scope === 'lead';
       return false;
@@ -1646,7 +1663,7 @@ export const SupportChatCircles: React.FC = () => {
       erroneos,
       todos: base.length,
     };
-  }, [circles, singleBucket]);
+  }, [circles, singleBucket, timeRangeFilter]);
 
   const { resendLeadsPool, resendTouchInfoMap } = useMemo(() => {
     const pool: Lead[] = [];
@@ -1697,6 +1714,7 @@ export const SupportChatCircles: React.FC = () => {
     const res = circles.filter((c) => {
       if (!matchesCircleBucketAndTray(c, selectedBuckets, specialTray)) return false;
       if (!matchesCircleStateFilters(c, stateFilters, isUnread(c))) return false;
+      if (!matchesChatTimeRange(c.lastMessageAt, timeRangeFilter)) return false;
 
       if (ownerFilter === 'mine' && !isMine(c)) return false;
       if (ownerFilter === 'unassigned' && !isUnassigned(c)) return false;
@@ -1772,11 +1790,11 @@ export const SupportChatCircles: React.FC = () => {
     }
     return res;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, selectedBuckets, stateFilters, specialTray, singleBucket, ownerFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, forcedUnreadMap, profile?.id]);
+  }, [circles, selectedBuckets, stateFilters, specialTray, singleBucket, ownerFilter, timeRangeFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, forcedUnreadMap, profile?.id]);
 
   useEffect(() => {
     setVisibleCircleLimit(80);
-  }, [selectedBuckets, stateFilters, specialTray, ownerFilter, channelFilter, leadSubFilter, searchQuery]);
+  }, [selectedBuckets, stateFilters, specialTray, ownerFilter, timeRangeFilter, channelFilter, leadSubFilter, searchQuery]);
 
   const batchFailedTargets = useMemo(() => {
     if (!stateFilters.includes('failed')) return [];
@@ -3861,6 +3879,7 @@ export const SupportChatCircles: React.FC = () => {
                                   onClick={() => {
                                     setSearchQuery('');
                                     setOwnerFilter('all');
+                                    setTimeRangeFilter('all');
                                     setChannelFilter('all');
                                     setSpecialTray(null);
                                     setStateFilters([]);
@@ -3913,6 +3932,7 @@ export const SupportChatCircles: React.FC = () => {
                                       onClick={() => {
                                         setSearchQuery('');
                                         setOwnerFilter('all');
+                                        setTimeRangeFilter('all');
                                         setChannelFilter('all');
                                         setSpecialTray(null);
                                         setStateFilters([]);
@@ -3972,6 +3992,7 @@ export const SupportChatCircles: React.FC = () => {
                                     onClick={() => {
                                       setSearchQuery('');
                                       setOwnerFilter('all');
+                                      setTimeRangeFilter('all');
                                       setChannelFilter('all');
                                       setSpecialTray(null);
                                       setStateFilters([]);
@@ -4127,10 +4148,11 @@ export const SupportChatCircles: React.FC = () => {
               {(() => {
                 const extraFilterCount =
                   (ownerFilter !== 'all' ? 1 : 0) +
+                  (timeRangeFilter !== 'all' ? 1 : 0) +
                   (channelFilter !== 'all' ? 1 : 0) +
                   (stateFilters.includes('replied') ? 1 : 0) +
                   (specialTray !== null ? 1 : 0);
-                const mobileExtraFilterCount = extraFilterCount + (selectedBuckets.length > 0 ? 1 : 0);
+                const mobileExtraFilterCount = extraFilterCount + selectedBuckets.length;
                 return (
                   <button
                     type="button"
@@ -4169,231 +4191,373 @@ export const SupportChatCircles: React.FC = () => {
               </button>
             </div>
 
-            {/* Clean Filter Dropdown Menu (Centered modal on mobile, anchored popover on desktop) */}
-            {showFilterMenu && (
-              <>
-                <div
-                  className="md:hidden fixed inset-0 bg-slate-900/35 backdrop-blur-[1px] z-[200]"
-                  onClick={() => setShowFilterMenu(false)}
-                />
-                <div className="fixed inset-x-3 top-28 max-h-[72dvh] overflow-y-auto z-[210] md:inset-auto md:absolute md:right-4 md:top-11 md:w-64 md:max-h-none md:z-30 bg-white border border-slate-200 rounded-2xl shadow-xl p-3.5 md:p-1.5 space-y-1.5 md:space-y-1 text-[15.5px] md:text-xs">
-                <div className="px-3 py-1.5 md:px-2.5 md:py-1 text-[14px] md:text-[11px] font-bold md:font-semibold text-slate-500 md:text-slate-400 flex items-center justify-between">
-                  <span>Refinar conversaciones</span>
-                  <button type="button" onClick={() => setShowFilterMenu(false)} className="p-1.5 md:p-0 text-slate-400 hover:text-slate-600">
-                    <X className="w-4.5 h-4.5 md:w-3 md:h-3" />
-                  </button>
-                </div>
+            {/* iOS Apple Bottom Sheet on mobile + anchored popover on desktop */}
+            {showFilterMenu && (() => {
+              const hasActiveSheetFilters =
+                selectedBuckets.length > 0 ||
+                specialTray !== null ||
+                timeRangeFilter !== 'all' ||
+                ownerFilter !== 'all' ||
+                channelFilter !== 'all' ||
+                stateFilters.includes('replied');
+              const closeIfDesktop = () => {
+                if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+                  setShowFilterMenu(false);
+                }
+              };
+              const resetSheetFilters = () => {
+                setSpecialTray(null);
+                setSelectedBuckets([]);
+                setTimeRangeFilter('all');
+                setOwnerFilter('all');
+                setChannelFilter('all');
+                setStateFilters((prev) => prev.filter((f) => f !== 'replied'));
+                setLeadSubFilter('activos');
+              };
+              const toggleMobileBucket = (bucketId: CircleBucket) => {
+                setSpecialTray(null);
+                setSelectedBuckets((prev) => {
+                  const next = toggleBucketSelection(prev, bucketId);
+                  setLeadSubFilter(next.length === 1 && next[0] === 'lead' ? 'nuevos' : 'activos');
+                  return next;
+                });
+              };
+              const mobileBucketItems: {
+                id: CircleBucket;
+                label: string;
+                countText: string | number;
+                accent?: boolean;
+              }[] = [
+                ...(scopes.soporte ? [{ id: 'soporte' as CircleBucket, label: 'Soporte', countText: counts.soporte }] : []),
+                ...(scopes.leads && scopes.leadsPool
+                  ? [{ id: 'por_clasificar' as CircleBucket, label: 'Por tomar', countText: counts.por_clasificar }]
+                  : []),
+                ...(scopes.leads
+                  ? [{ id: 'lead' as CircleBucket, label: scopes.all ? 'Leads' : 'Mis leads', countText: counts.lead }]
+                  : []),
+                ...(scopes.leads && (counts.reactivatedTotal > 0 || selectedBuckets.includes('reactivados'))
+                  ? [
+                      {
+                        id: 'reactivados' as CircleBucket,
+                        label: 'Reactivados',
+                        countText: `${counts.reactivatedReplied} resp.`,
+                        accent: true,
+                      },
+                    ]
+                  : []),
+              ];
+              return (
+                <>
+                  <div
+                    className="md:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[200] animate-ios-backdrop"
+                    onClick={() => setShowFilterMenu(false)}
+                  />
+                  <div
+                    className="hidden md:block fixed inset-0 z-[25]"
+                    onClick={() => setShowFilterMenu(false)}
+                  />
+                  <div className="fixed inset-x-0 bottom-0 h-[85dvh] max-h-[90dvh] z-[210] flex flex-col rounded-t-[28px] bg-white shadow-[0_-14px_44px_rgba(15,23,42,0.22)] ring-1 ring-slate-900/5 animate-ios-sheet-up overflow-hidden md:inset-auto md:bottom-auto md:h-auto md:max-h-[78vh] md:absolute md:right-4 md:top-11 md:w-72 md:z-30 md:rounded-2xl md:border md:border-slate-200 md:shadow-xl md:animate-none">
+                    {/* Grabber iOS */}
+                    <div className="md:hidden pt-2.5 pb-1 flex justify-center shrink-0">
+                      <span className="w-10 h-1.5 rounded-full bg-slate-300/90" />
+                    </div>
 
-                {/* Bandejas en móvil (evita saturar la barra superior) */}
-                <div className="md:hidden pb-1.5 mb-1 border-b border-slate-100 space-y-0.5">
-                  <div className="px-3 py-1 text-[12px] font-bold uppercase tracking-wider text-slate-400">Bandeja</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSpecialTray(null);
-                      setSelectedBuckets([]);
-                      setLeadSubFilter('activos');
-                      setShowFilterMenu(false);
-                    }}
-                    className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
-                      specialTray === null && selectedBuckets.length === 0
-                        ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                        : 'text-slate-700 hover:bg-slate-50 font-medium'
-                    }`}
-                  >
-                    <span>Todas las conversaciones</span>
-                    <span className="text-[14.5px] font-semibold text-slate-400">{counts.all}</span>
-                  </button>
-                  {scopes.soporte && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSpecialTray(null);
-                        setLeadSubFilter('activos');
-                        setSelectedBuckets(['soporte']);
-                        setShowFilterMenu(false);
-                      }}
-                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
-                        specialTray === null && selectedBuckets.includes('soporte')
-                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>Soporte</span>
-                      <span className="text-[14.5px] font-semibold text-slate-400">{counts.soporte}</span>
-                    </button>
-                  )}
-                  {scopes.leads && scopes.leadsPool && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSpecialTray(null);
-                        setLeadSubFilter('activos');
-                        setSelectedBuckets(['por_clasificar']);
-                        setShowFilterMenu(false);
-                      }}
-                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
-                        specialTray === null && selectedBuckets.includes('por_clasificar')
-                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>Por tomar</span>
-                      <span className="text-[14.5px] font-semibold text-slate-400">{counts.por_clasificar}</span>
-                    </button>
-                  )}
-                  {scopes.leads && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSpecialTray(null);
-                        setLeadSubFilter('nuevos');
-                        setSelectedBuckets(['lead']);
-                        setShowFilterMenu(false);
-                      }}
-                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
-                        specialTray === null && selectedBuckets.includes('lead')
-                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>{scopes.all ? 'Leads' : 'Mis leads'}</span>
-                      <span className="text-[14.5px] font-semibold text-slate-400">{counts.lead}</span>
-                    </button>
-                  )}
-                  {scopes.leads && (counts.reactivatedTotal > 0 || selectedBuckets.includes('reactivados')) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSpecialTray(null);
-                        setLeadSubFilter('activos');
-                        setSelectedBuckets(['reactivados']);
-                        setShowFilterMenu(false);
-                      }}
-                      className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
-                        specialTray === null && selectedBuckets.includes('reactivados')
-                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>Reactivados</span>
-                      <span className="text-[14.5px] font-semibold text-indigo-600">{counts.reactivatedReplied} resp.</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Estado adicional combinable */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
-                    setStateFilters((prev) => toggleStateFilterSelection(prev, 'replied'));
-                    setShowFilterMenu(false);
-                  }}
-                  className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
-                    stateFilters.includes('replied')
-                      ? 'bg-emerald-50 text-emerald-700 font-semibold'
-                      : 'text-slate-700 hover:bg-slate-50 font-medium'
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <CheckCheck className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-emerald-600" />
-                    Ya respondidos / atendidos
-                  </span>
-                  <span className="text-[14.5px] md:text-xs font-semibold md:font-normal text-slate-400">{contextCounts.replied}</span>
-                </button>
-
-                <div className="pt-1 mt-1 border-t border-slate-100 space-y-0.5">
-                  <div className="px-3 py-1 md:px-2.5 md:py-0.5 text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">Responsable / SLA</div>
-                  {(
-                    [
-                      { id: 'all', label: 'Todos los agentes', count: contextCounts.total },
-                      { id: 'mine', label: 'Asignados a mí', count: contextCounts.mine },
-                      { id: 'unassigned', label: 'Sin asignar', count: contextCounts.unassigned },
-                      { id: 'urgent', label: 'Espera > 15 min', count: contextCounts.urgent, urgent: true },
-                    ] as { id: OwnerSubFilter; label: string; count: number; urgent?: boolean }[]
-                  ).map((sf) => {
-                    const active = ownerFilter === sf.id && specialTray === null;
-                    return (
-                      <button
-                        key={sf.id}
-                        type="button"
-                        onClick={() => {
-                          if (specialTray !== null) setSpecialTray(null);
-                          setOwnerFilter(sf.id);
-                          setShowFilterMenu(false);
-                        }}
-                        className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
-                          active
-                            ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                            : sf.urgent && sf.count > 0
-                            ? 'text-rose-600 hover:bg-rose-50/60 font-medium'
-                            : 'text-slate-700 hover:bg-slate-50 font-medium'
-                        }`}
-                      >
-                        <span>{sf.label}</span>
-                        <span className="text-[14.5px] md:text-xs font-semibold md:font-normal text-slate-400">{sf.count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {scopes.all && (
-                  <div className="pt-1.5 mt-1 border-t border-slate-100 space-y-0.5">
-                    <div className="px-3 py-1 md:px-2.5 md:py-0.5 text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">Otras bandejas</div>
-                    {(
-                      [
-                        { id: 'interno' as SpecialTray, label: 'Equipo interno', count: counts.interno },
-                        { id: 'spam' as SpecialTray, label: 'Spam / bloqueados', count: counts.spam },
-                        ...(counts.tickets > 0 ? [{ id: 'tickets' as SpecialTray, label: 'Otros tickets (no WhatsApp)', count: counts.tickets }] : []),
-                      ]
-                    ).map((sec) => {
-                      const active = specialTray === sec.id;
-                      return (
+                    {/* Cabecera fija */}
+                    <div className="px-4 py-2.5 md:px-3 md:py-2 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0 bg-white">
+                      <span className="text-[16.5px] md:text-[12px] font-bold text-slate-900 md:text-slate-500 tracking-tight">
+                        Refinar conversaciones
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {hasActiveSheetFilters && (
+                          <button
+                            type="button"
+                            onClick={resetSheetFilters}
+                            className="px-2 py-1 rounded-lg text-[13.5px] md:text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50 transition"
+                          >
+                            Limpiar
+                          </button>
+                        )}
                         <button
-                          key={sec.id}
+                          type="button"
+                          onClick={() => setShowFilterMenu(false)}
+                          aria-label="Cerrar filtros"
+                          className="w-8 h-8 md:w-5 md:h-5 rounded-full bg-slate-100 md:bg-transparent flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 transition"
+                        >
+                          <X className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Cuerpo con scroll cómodo */}
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3.5 md:p-2 space-y-4 md:space-y-2 text-[15.5px] md:text-xs">
+                      {/* PERÍODO: Todo · Hoy · Semana · Mes */}
+                      <div className="space-y-1.5">
+                        <div className="px-1 md:px-1.5 flex items-center justify-between">
+                          <span className="text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Período
+                          </span>
+                          <span className="text-[11.5px] md:text-[10px] font-medium text-slate-400">
+                            Día · Semana · Mes
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl md:rounded-xl bg-slate-100/90">
+                          {(
+                            [
+                              { id: 'all' as ChatTimeRangeFilter, label: 'Todo', count: periodCounts.all },
+                              { id: 'today' as ChatTimeRangeFilter, label: 'Hoy', count: periodCounts.today },
+                              { id: 'week' as ChatTimeRangeFilter, label: 'Semana', count: periodCounts.week },
+                              { id: 'month' as ChatTimeRangeFilter, label: 'Mes', count: periodCounts.month },
+                            ]
+                          ).map((p) => {
+                            const active = timeRangeFilter === p.id;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => setTimeRangeFilter(p.id)}
+                                className={`py-2 px-1 md:py-1.5 rounded-xl md:rounded-lg text-center transition flex flex-col items-center justify-center leading-tight ${
+                                  active
+                                    ? 'bg-white text-indigo-700 font-bold shadow-xs ring-1 ring-slate-900/5'
+                                    : 'text-slate-600 hover:text-slate-900 font-medium'
+                                }`}
+                              >
+                                <span className="text-[13.5px] md:text-[11px]">{p.label}</span>
+                                <span
+                                  className={`text-[11px] md:text-[9.5px] mt-0.5 font-semibold ${
+                                    active ? 'text-indigo-500' : 'text-slate-400'
+                                  }`}
+                                >
+                                  {p.count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* BANDEJA multi-selección en móvil */}
+                      <div className="md:hidden pt-3 border-t border-slate-100 space-y-1">
+                        <div className="px-1 flex items-center justify-between">
+                          <span className="text-[12px] font-bold uppercase tracking-wider text-slate-400">Bandeja</span>
+                          <span className="text-[12px] font-semibold text-indigo-600">
+                            {selectedBuckets.length > 0 ? `${selectedBuckets.length} selec.` : 'Puedes elegir varias'}
+                          </span>
+                        </div>
+                        <button
                           type="button"
                           onClick={() => {
-                            setSearchQuery('');
-                            setOwnerFilter('all');
-                            setChannelFilter('all');
+                            setSpecialTray(null);
                             setSelectedBuckets([]);
-                            setSpecialTray(active ? null : sec.id);
-                            setShowFilterMenu(false);
+                            setLeadSubFilter('activos');
                           }}
-                          className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
-                            active ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                          className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
+                            specialTray === null && selectedBuckets.length === 0
+                              ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                              : 'text-slate-700 hover:bg-slate-50 font-medium'
                           }`}
                         >
-                          <span>{sec.label}</span>
-                          <span className="text-[14.5px] md:text-xs font-semibold md:font-normal text-slate-400">{sec.count}</span>
+                          <span className="inline-flex items-center gap-2.5">
+                            <span
+                              className={`w-5 h-5 rounded-full flex items-center justify-center transition ${
+                                specialTray === null && selectedBuckets.length === 0
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'border-2 border-slate-300 bg-white'
+                              }`}
+                            >
+                              {specialTray === null && selectedBuckets.length === 0 && <Check className="w-3 h-3" />}
+                            </span>
+                            <span>Todas las conversaciones</span>
+                          </span>
+                          <span className="text-[14px] font-semibold text-slate-400">{counts.all}</span>
                         </button>
-                      );
-                    })}
-                  </div>
-                )}
+                        {mobileBucketItems.map((b) => {
+                          const checked = specialTray === null && selectedBuckets.includes(b.id);
+                          return (
+                            <button
+                              key={b.id}
+                              type="button"
+                              onClick={() => toggleMobileBucket(b.id)}
+                              className={`w-full px-3 py-2.5 rounded-xl flex items-center justify-between transition ${
+                                checked
+                                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                                  : 'text-slate-700 hover:bg-slate-50 font-medium'
+                              }`}
+                            >
+                              <span className="inline-flex items-center gap-2.5">
+                                <span
+                                  className={`w-5 h-5 rounded-full flex items-center justify-center transition ${
+                                    checked ? 'bg-indigo-600 text-white' : 'border-2 border-slate-300 bg-white'
+                                  }`}
+                                >
+                                  {checked && <Check className="w-3 h-3" />}
+                                </span>
+                                <span>{b.label}</span>
+                              </span>
+                              <span
+                                className={`text-[14px] font-semibold ${
+                                  b.accent ? 'text-indigo-600' : 'text-slate-400'
+                                }`}
+                              >
+                                {b.countText}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
 
-                {scopes.soporte && (selectedBuckets.length === 0 || selectedBuckets.includes('soporte')) && (
-                  <div className="pt-1.5 mt-1 border-t border-slate-100 px-2 pb-1 space-y-1">
-                    <span className="text-[13.5px] md:text-[11px] font-semibold text-slate-400">Área de soporte</span>
-                    <select
-                      value={channelFilter}
-                      onChange={(e) => {
-                        setChannelFilter(e.target.value as 'all' | SupportChannelType);
-                        setShowFilterMenu(false);
-                      }}
-                      className="w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl text-[15px] md:text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200 focus:outline-none"
-                    >
-                      <option value="all">Todas las áreas</option>
-                      <option value="soporte">Soporte / Operaciones</option>
-                      <option value="contabilidad">Contabilidad / Finanzas</option>
-                      <option value="otros">Otros</option>
-                    </select>
+                      {/* Estado adicional combinable */}
+                      <div className="pt-3 md:pt-2 border-t border-slate-100 space-y-1">
+                        <div className="px-1 md:px-1.5 text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Estado
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                            setStateFilters((prev) => toggleStateFilterSelection(prev, 'replied'));
+                            closeIfDesktop();
+                          }}
+                          className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
+                            stateFilters.includes('replied')
+                              ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                              : 'text-slate-700 hover:bg-slate-50 font-medium'
+                          }`}
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <CheckCheck className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-emerald-600" />
+                            <span>Ya respondidos / atendidos</span>
+                          </span>
+                          <span className="text-[14px] md:text-xs font-semibold md:font-normal text-slate-400">
+                            {contextCounts.replied}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Responsable / SLA */}
+                      <div className="pt-3 md:pt-2 border-t border-slate-100 space-y-0.5">
+                        <div className="px-1 md:px-1.5 pb-0.5 text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Responsable / SLA
+                        </div>
+                        {(
+                          [
+                            { id: 'all', label: 'Todos los agentes', count: contextCounts.total },
+                            { id: 'mine', label: 'Asignados a mí', count: contextCounts.mine },
+                            { id: 'unassigned', label: 'Sin asignar', count: contextCounts.unassigned },
+                            { id: 'urgent', label: 'Espera > 15 min', count: contextCounts.urgent, urgent: true },
+                          ] as { id: OwnerSubFilter; label: string; count: number; urgent?: boolean }[]
+                        ).map((sf) => {
+                          const active = ownerFilter === sf.id && specialTray === null;
+                          return (
+                            <button
+                              key={sf.id}
+                              type="button"
+                              onClick={() => {
+                                if (specialTray !== null) setSpecialTray(null);
+                                setOwnerFilter(sf.id);
+                                closeIfDesktop();
+                              }}
+                              className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
+                                active
+                                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                                  : sf.urgent && sf.count > 0
+                                  ? 'text-rose-600 hover:bg-rose-50/60 font-medium'
+                                  : 'text-slate-700 hover:bg-slate-50 font-medium'
+                              }`}
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                {active && <Check className="w-4 h-4 md:w-3 md:h-3 text-indigo-600 shrink-0" />}
+                                <span>{sf.label}</span>
+                              </span>
+                              <span className="text-[14px] md:text-xs font-semibold md:font-normal text-slate-400">
+                                {sf.count}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {scopes.all && (
+                        <div className="pt-3 md:pt-2 border-t border-slate-100 space-y-0.5">
+                          <div className="px-1 md:px-1.5 pb-0.5 text-[12px] md:text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            Otras bandejas
+                          </div>
+                          {(
+                            [
+                              { id: 'interno' as SpecialTray, label: 'Equipo interno', count: counts.interno },
+                              { id: 'spam' as SpecialTray, label: 'Spam / bloqueados', count: counts.spam },
+                              ...(counts.tickets > 0
+                                ? [{ id: 'tickets' as SpecialTray, label: 'Otros tickets (no WhatsApp)', count: counts.tickets }]
+                                : []),
+                            ]
+                          ).map((sec) => {
+                            const active = specialTray === sec.id;
+                            return (
+                              <button
+                                key={sec.id}
+                                type="button"
+                                onClick={() => {
+                                  setSearchQuery('');
+                                  setOwnerFilter('all');
+                                  setChannelFilter('all');
+                                  setSelectedBuckets([]);
+                                  setSpecialTray(active ? null : sec.id);
+                                  closeIfDesktop();
+                                }}
+                                className={`w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl flex items-center justify-between transition ${
+                                  active ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                                }`}
+                              >
+                                <span className="inline-flex items-center gap-2">
+                                  {active && <Check className="w-4 h-4 md:w-3 md:h-3 text-indigo-600 shrink-0" />}
+                                  <span>{sec.label}</span>
+                                </span>
+                                <span className="text-[14px] md:text-xs font-semibold md:font-normal text-slate-400">
+                                  {sec.count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {scopes.soporte && (selectedBuckets.length === 0 || selectedBuckets.includes('soporte')) && (
+                        <div className="pt-3 md:pt-2 border-t border-slate-100 px-1 pb-2 space-y-1.5">
+                          <span className="text-[13px] md:text-[11px] font-semibold text-slate-400">Área de soporte</span>
+                          <select
+                            value={channelFilter}
+                            onChange={(e) => {
+                              setChannelFilter(e.target.value as 'all' | SupportChannelType);
+                              closeIfDesktop();
+                            }}
+                            className="w-full px-3 py-2.5 md:px-2.5 md:py-1.5 rounded-xl text-[15px] md:text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200 focus:outline-none"
+                          >
+                            <option value="all">Todas las áreas</option>
+                            <option value="soporte">Soporte / Operaciones</option>
+                            <option value="contabilidad">Contabilidad / Finanzas</option>
+                            <option value="otros">Otros</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Botón fijo inferior (estilo Apple Bottom Sheet) */}
+                    <div className="md:hidden shrink-0 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setShowFilterMenu(false)}
+                        className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-[15.5px] font-bold shadow-[0_6px_18px_rgba(79,70,229,0.28)] transition"
+                      >
+                        {filteredCircles.length === 0
+                          ? 'Sin resultados'
+                          : filteredCircles.length === 1
+                          ? 'Ver 1 conversación'
+                          : `Ver ${filteredCircles.length} conversaciones`}
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
-              </>
-            )}
+                </>
+              );
+            })()}
 
             {/* Row 1 Mobile: Chip de bandeja activa siempre visible + Todos · Sin responder · No leídos */}
             <div className="flex md:hidden items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -4433,6 +4597,17 @@ export const SupportChatCircles: React.FC = () => {
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
+              {timeRangeFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setTimeRangeFilter('all')}
+                  className="px-3.5 py-2 rounded-full text-[14px] whitespace-nowrap shrink-0 bg-sky-50 text-sky-700 ring-1 ring-sky-200/80 font-bold inline-flex items-center gap-1.5"
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{CHAT_TIME_RANGE_LABELS[timeRangeFilter]}</span>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -4440,11 +4615,12 @@ export const SupportChatCircles: React.FC = () => {
                   setSelectedBuckets([]);
                   setStateFilters([]);
                   setOwnerFilter('all');
+                  setTimeRangeFilter('all');
                   setChannelFilter('all');
                   setLeadSubFilter('activos');
                 }}
                 className={`px-4 py-2 rounded-full text-[14.5px] whitespace-nowrap transition shrink-0 ${
-                  specialTray === null && selectedBuckets.length === 0 && stateFilters.length === 0
+                  specialTray === null && selectedBuckets.length === 0 && stateFilters.length === 0 && timeRangeFilter === 'all'
                     ? 'bg-slate-900 text-white font-bold'
                     : 'bg-slate-100 text-slate-700 font-semibold'
                 }`}
@@ -4636,9 +4812,22 @@ export const SupportChatCircles: React.FC = () => {
                 </button>
               )}
 
+              {timeRangeFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setTimeRangeFilter('all')}
+                  className="px-2 py-0.5 rounded-lg text-[11.5px] whitespace-nowrap bg-sky-50 text-sky-700 border border-sky-200 font-semibold inline-flex items-center gap-1"
+                >
+                  <Calendar className="w-3 h-3" />
+                  <span>{CHAT_TIME_RANGE_LABELS[timeRangeFilter]}</span>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+
               {(selectedBuckets.length > 0 ||
                 stateFilters.length > 0 ||
                 ownerFilter !== 'all' ||
+                timeRangeFilter !== 'all' ||
                 channelFilter !== 'all' ||
                 specialTray !== null) && (
                 <button
@@ -4648,6 +4837,7 @@ export const SupportChatCircles: React.FC = () => {
                     setStateFilters([]);
                     setSpecialTray(null);
                     setOwnerFilter('all');
+                    setTimeRangeFilter('all');
                     setChannelFilter('all');
                     setLeadSubFilter('activos');
                   }}

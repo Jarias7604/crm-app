@@ -844,3 +844,32 @@ test('16. classifyLeadStageGroup, isFreshLeadWithinHours, and getFreshLeadLabel 
   assert.equal(getFreshLeadLabel('2026-11-28T01:00:00Z', '2026-11-26T22:00:00Z', now), 'Nuevo · Ayer');
   assert.equal(getFreshLeadLabel(null, '2026-11-27T19:00:00Z', now), null);
 });
+
+test('17. matchesChatTimeRange and multi-bucket toggle filter by Hoy/Semana/Mes and combined bandejas', () => {
+  const { matchesChatTimeRange, toggleBucketSelection, matchesCircleBucketAndTray } = loaded.waHelpers;
+  const now = Date.parse('2026-11-28T03:00:00Z'); // 2026-11-27 21:00 America/El_Salvador
+
+  // Hoy (same SV calendar day)
+  assert.equal(matchesChatTimeRange('2026-11-27T18:00:00Z', 'today', now), true);
+  assert.equal(matchesChatTimeRange('2026-11-26T22:00:00Z', 'today', now), false);
+
+  // Semana (last 7 SV calendar days: 2026-11-21..2026-11-27)
+  assert.equal(matchesChatTimeRange('2026-11-21T15:00:00Z', 'week', now), true);
+  assert.equal(matchesChatTimeRange('2026-11-20T15:00:00Z', 'week', now), false);
+
+  // Mes (2026-11)
+  assert.equal(matchesChatTimeRange('2026-11-01T12:00:00Z', 'month', now), true);
+  assert.equal(matchesChatTimeRange('2026-10-31T20:00:00Z', 'month', now), false);
+
+  // All / missing
+  assert.equal(matchesChatTimeRange('2026-10-31T20:00:00Z', 'all', now), true);
+  assert.equal(matchesChatTimeRange(null, 'today', now), false);
+  assert.equal(matchesChatTimeRange('not-a-date', 'month', now), false);
+
+  // Multi-select Bandejas (e.g. Leads + Por tomar)
+  const combined = toggleBucketSelection(['lead'], 'por_clasificar');
+  assert.deepEqual(combined, ['lead', 'por_clasificar']);
+  assert.equal(matchesCircleBucketAndTray({ isWhatsApp: true, scope: 'lead', isReactivation: false }, combined, null), true);
+  assert.equal(matchesCircleBucketAndTray({ isWhatsApp: true, scope: 'por_clasificar', isReactivation: false }, combined, null), true);
+  assert.equal(matchesCircleBucketAndTray({ isWhatsApp: true, scope: 'soporte', isReactivation: false }, combined, null), false);
+});

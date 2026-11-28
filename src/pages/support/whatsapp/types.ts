@@ -32,6 +32,8 @@ export type CircleStateFilter = 'unopened' | 'unread' | 'waiting' | 'replied' | 
 
 export type CircleTeamStatus = 'unopened' | 'seen_waiting' | 'replied' | 'attended' | 'idle';
 
+export type ChatTimeRangeFilter = 'all' | 'today' | 'week' | 'month';
+
 export interface SupportCircle {
   circleId: string;
   clientName: string;
